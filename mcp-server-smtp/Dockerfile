@@ -1,31 +1,51 @@
-FROM node:18-alpine
+# Multi-stage build for smaller production image
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy package files
 COPY package*.json ./
+COPY tsconfig.json ./
 
-# Install TypeScript globally
-RUN npm install -g typescript
+# Install dependencies including dev dependencies for build
+RUN npm ci --only=production=false
 
-# Install dependencies
-RUN npm install --ignore-scripts
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
 
-# Copy the rest of the application
-COPY . .
+# Build the application
+RUN npm run build
 
-# Create config directory if it doesn't exist
-RUN mkdir -p /app/config
+# Production stage
+FROM node:18-alpine AS production
 
-# Create default config file if it doesn't exist
-RUN if [ ! -f /app/config/default.json ]; then \
-    echo '{"port":3007,"logLevel":"info","smtp":{"configs":[]}}' > /app/config/default.json; \
-    fi
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
-# Create logs directory
-RUN mkdir -p /app/logs
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
 
-# Expose the port
+WORKDIR /app
+
+# Copy package files and install only production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/config ./config
+
+# Create directories with proper permissions
+RUN mkdir -p /app/logs && \
+    mkdir -p /app/config && \
+    chown -R nextjs:nodejs /app
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
 EXPOSE 3007
 
 # Set environment variables
@@ -33,8 +53,12 @@ ENV NODE_ENV=production
 ENV PORT=3007
 ENV LOG_LEVEL=info
 
-# Compile TypeScript to JavaScript
-RUN tsc --project tsconfig.json
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "const http = require('http'); const options = { host: 'localhost', port: process.env.PORT || 3007, path: '/api/list-tools', timeout: 2000 }; const req = http.request(options, (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1); }); req.on('error', () => process.exit(1)); req.end();"
 
-# Run the application
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
 CMD ["node", "build/index.js"]

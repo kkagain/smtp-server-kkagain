@@ -20,6 +20,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as http from 'http';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Set up logging to a file instead of console
 const logDir = path.join(os.tmpdir(), 'smtp-mcp-server-logs');
