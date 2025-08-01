@@ -1,0 +1,6 @@
+{
+  "to": [{"email": "karoraca@gmail.com", "name": "Kamal"}],
+  "subject": "Test Email from SMTP MCP Server - Working Successfully! 🚀",
+  "body": "<h1>🎉 SMTP MCP Server Test Email</h1><p>Hello Kamal,</p><p>This is a <strong>successful test email</strong> from your SMTP MCP Server!</p><h2>✅ What this proves:</h2><ul><li>Your Gmail SMTP configuration is working correctly</li><li>The MCP server is successfully sending emails</li><li>Your app password is configured properly</li><li>The server can handle real email delivery</li></ul><p>🔧 <strong>Technical Details:</strong></p><ul><li>Sent via: smtp.gmail.com:587</li><li>From: bot.a3asolutions@gmail.com</li><li>Server: SMTP MCP Server v1.0.0</li><li>Protocol: Model Context Protocol (MCP)</li></ul><p>Your SMTP MCP Server is now ready for production use with AI agents and applications!</p><br><p>Best regards,<br><strong>SMTP MCP Server</strong><br><em>Ready to serve your email automation needs</em></p>",
+  "smtpConfigId": "4aade8ac-56ac-4ef0-86ab-58907e8f5c64"
+}

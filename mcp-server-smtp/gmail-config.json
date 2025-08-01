@@ -1,0 +1,10 @@
+{
+  "name": "bot.a3asolutions@gmail.com",
+  "host": "smtp.gmail.com",
+  "port": 587,
+  "secure": false,
+  "auth": {
+    "user": "bot.a3asolutions@gmail.com",
+    "pass": "qtqd bcqk qzgg iwjc"
+  }
+}

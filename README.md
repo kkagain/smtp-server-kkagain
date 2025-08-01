@@ -1,34 +1,44 @@
-# SMTP MCP Server
+# SMTP MCP Server - Enterprise Email Platform
 
-A powerful **Model Context Protocol (MCP) server** that provides SMTP email functionality for AI agents and applications. This server enables any MCP-compatible client to send emails, manage SMTP configurations, handle email templates, and track email logs through a standardized interface.
+A comprehensive **Model Context Protocol (MCP) server** for SMTP email operations with enterprise-grade features including advanced tracking, analytics, campaign management, and multi-database support. Perfect for AI agents and applications requiring professional email capabilities.
 
-## 🚀 Features
+## 🚀 Enhanced Features
 
-### Core Email Functionality
-- **Send Individual Emails**: Send emails with support for HTML content, attachments, and multiple recipients
-- **Bulk Email Support**: Send emails in batches with rate limiting and delay controls
-- **Multiple Recipients**: Support for TO, CC, and BCC recipients
-- **HTML & Plain Text**: Full support for HTML email content with fallback to plain text
+### 🔥 Core Email Platform
+- **Dual Protocol Support**: MCP and RESTful API interfaces
+- **Advanced Email Operations**: Send, track, and analyze emails with comprehensive logging
+- **Real-time Analytics**: Geographic insights, open/click tracking, bounce handling
+- **Multi-Database Support**: SQLite (development), PostgreSQL, Supabase (production)
+- **Campaign Management**: Bulk sending, templates, contact lists, and performance analytics
+- **Enterprise Security**: JWT authentication, rate limiting, CORS protection
 
-### Configuration Management
-- **Multiple SMTP Servers**: Configure and manage multiple SMTP server configurations
-- **Dynamic Configuration**: Add, update, and delete SMTP configurations at runtime
-- **Secure Storage**: SMTP credentials stored securely in local configuration files
+### 📊 Professional Tracking & Analytics
+- **Email Tracking**: Pixel-based open tracking, click tracking with redirects
+- **Geographic Analytics**: IP-based location detection (country/city level)
+- **Event Timeline**: Complete email journey from send to engagement
+- **Performance Metrics**: Delivery rates, engagement rates, geographic distribution
+- **Real-time Dashboard**: Live email performance monitoring
 
-### Email Templates
-- **Template Management**: Create, update, and delete reusable email templates
-- **Variable Substitution**: Support for dynamic content using `{{variable}}` syntax
-- **Template Library**: Maintain a library of commonly used email templates
+### 🗄️ Advanced Database Integration
+- **Multi-Database**: SQLite, PostgreSQL, Supabase with automatic migration
+- **Comprehensive Schema**: 15+ tables for users, campaigns, tracking, analytics
+- **User Authentication**: Supabase Auth integration with Row Level Security
+- **Contact Management**: Full CRUD operations with custom fields and segmentation
+- **Campaign Analytics**: Real-time performance tracking and reporting
 
-### Monitoring & Logging
-- **Email Logs**: Track all sent emails with timestamps, recipients, and status
-- **Error Handling**: Comprehensive error logging and reporting
-- **Rate Limiting**: Built-in rate limiting to prevent spam and server overload
+### 🔐 Enterprise Security & Authentication
+- **User-Based SMTP Configs**: Each user manages their own SMTP credentials
+- **JWT Authentication**: Secure API access with Supabase Auth integration
+- **Row Level Security**: Database-level access control
+- **Rate Limiting**: IP-based request throttling and email sending limits
+- **CORS Protection**: Configurable cross-origin request security
 
-### Dual Interface
-- **MCP Protocol**: Full MCP server implementation for AI agents
-- **HTTP API**: RESTful HTTP API for direct integration with web applications
-- **CORS Support**: Cross-origin requests enabled for web applications
+### 🌍 Geographic & Engagement Tracking
+- **IP Geolocation**: Real-time country/city detection using geoip-lite
+- **Open Tracking**: Invisible pixel tracking with timestamp recording
+- **Click Tracking**: Automatic link wrapping with redirect analytics
+- **User Agent Detection**: Browser/device identification
+- **Bounce Handling**: Automatic bounce classification and processing
 
 ## 📋 Prerequisites
 
@@ -88,56 +98,630 @@ The server will start on port 3007 by default. You can change this by setting th
 PORT=8080 npm start
 ```
 
-### Basic Usage Examples
+## 🐳 Docker Deployment
 
-#### Using HTTP API
+### Quick Docker Setup
 
-**1. Add SMTP Configuration**
 ```bash
-curl -X POST http://localhost:3007/api/add-smtp-config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "gmail",
-    "name": "Gmail SMTP",
-    "host": "smtp.gmail.com",
-    "port": 587,
-    "secure": false,
-    "auth": {
-      "user": "your-email@gmail.com",
-      "pass": "your-app-password"
+# Build the Docker image
+docker build -t smtp-mcp-server .
+
+# Run with environment file
+docker run -d \
+  --name smtp-server \
+  -p 3007:3007 \
+  -p 4000:4000 \
+  --env-file .env \
+  smtp-mcp-server
+
+# Check logs
+docker logs smtp-server
+```
+
+### Docker Compose (Recommended for Production)
+
+Create `docker-compose.yml`:
+```yaml
+version: '3.8'
+services:
+  smtp-server:
+    build: ./mcp-server-smtp
+    ports:
+      - "3007:3007"  # MCP/HTTP Server
+      - "4000:4000"  # API Server
+      - "3000:3000"  # Tracking Server
+    environment:
+      - NODE_ENV=production
+      - DATABASE_TYPE=postgres
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=smtp_server
+      - POSTGRES_USER=smtp_user
+      - POSTGRES_PASSWORD=secure_password
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: smtp_server
+      POSTGRES_USER: smtp_user
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Start with Docker Compose
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+## 🚀 VPS Deployment with GitHub Actions
+
+### 1. GitHub Actions Workflow
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy SMTP MCP Server to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'mcp-server-smtp/package-lock.json'
+    
+    - name: Install dependencies
+      run: |
+        cd mcp-server-smtp
+        npm ci --only=production
+    
+    - name: Build project
+      run: |
+        cd mcp-server-smtp
+        npm run build
+    
+    - name: Create deployment package
+      run: |
+        tar -czf deployment.tar.gz \
+          mcp-server-smtp/dist \
+          mcp-server-smtp/package.json \
+          mcp-server-smtp/database \
+          mcp-server-smtp/.env.example \
+          docker-compose.yml \
+          Dockerfile
+    
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT || 22 }}
+        script: |
+          # Create deployment directory
+          sudo mkdir -p /opt/smtp-server
+          cd /opt/smtp-server
+          
+          # Backup current deployment
+          if [ -d "current" ]; then
+            sudo mv current backup-$(date +%Y%m%d-%H%M%S)
+          fi
+          
+          # Clone/update repository
+          if [ ! -d "smtp-server-kkagain" ]; then
+            sudo git clone https://github.com/${{ github.repository }}.git smtp-server-kkagain
+          else
+            cd smtp-server-kkagain
+            sudo git pull origin main
+            cd ..
+          fi
+          
+          # Create symlink to current
+          sudo ln -sfn smtp-server-kkagain current
+          
+          # Navigate to project
+          cd current/mcp-server-smtp
+          
+          # Install dependencies and build
+          sudo npm ci --only=production
+          sudo npm run build
+          
+          # Restart services with Docker Compose
+          cd ..
+          sudo docker-compose down
+          sudo docker-compose up -d --build
+          
+          # Clean up old backups (keep last 5)
+          cd /opt/smtp-server
+          sudo ls -dt backup-* | tail -n +6 | sudo xargs rm -rf || true
+
+    - name: Verify deployment
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT || 22 }}
+        script: |
+          cd /opt/smtp-server
+          
+          # Check if services are running
+          sudo docker-compose ps
+          
+          # Test health endpoint
+          sleep 10
+          curl -f http://localhost:4000/health || exit 1
+          
+          echo "✅ Deployment successful!"
+```
+
+### 2. VPS Initial Setup
+
+Run these commands on your VPS:
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker and Docker Compose
+sudo apt install -y docker.io docker-compose git curl
+
+# Start and enable Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add your user to docker group
+sudo usermod -aG docker $USER
+
+# Create directory structure
+sudo mkdir -p /opt/smtp-server
+sudo chown $USER:$USER /opt/smtp-server
+
+# Configure firewall (if ufw is enabled)
+sudo ufw allow 22    # SSH
+sudo ufw allow 80    # HTTP
+sudo ufw allow 443   # HTTPS
+sudo ufw allow 3007  # MCP Server (optional, for testing)
+sudo ufw allow 4000  # API Server
+
+# Setup reverse proxy with Nginx (optional)
+sudo apt install -y nginx
+
+# Create Nginx configuration
+sudo tee /etc/nginx/sites-available/smtp-server << EOF
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # API endpoints
+    location /api/ {
+        proxy_pass http://localhost:4000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
-  }'
+    
+    # Tracking endpoints
+    location /track/ {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+    
+    # Health check
+    location /health {
+        proxy_pass http://localhost:4000/health;
+    }
+}
+EOF
+
+# Enable the site
+sudo ln -s /etc/nginx/sites-available/smtp-server /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
-**2. Send Email**
+### 3. Required GitHub Secrets
+
+Add these secrets in your GitHub repository settings:
+
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `VPS_HOST` | Your VPS IP address | `123.45.67.89` |
+| `VPS_USERNAME` | SSH username | `ubuntu` or `root` |
+| `VPS_SSH_KEY` | Private SSH key | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `VPS_PORT` | SSH port (optional) | `22` |
+
+### 4. Environment Configuration on VPS
+
+Create `.env` file on your VPS at `/opt/smtp-server/current/mcp-server-smtp/.env`:
+
 ```bash
-curl -X POST http://localhost:3007/api/send-email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": [{"email": "recipient@example.com", "name": "John Doe"}],
-    "subject": "Hello from SMTP MCP Server",
-    "body": "<h1>Hello!</h1><p>This is a test email.</p>",
-    "smtpConfigId": "gmail"
-  }'
+# Production Environment Configuration
+NODE_ENV=production
+SERVER_MODE=api
+
+# Database (use PostgreSQL for production)
+DATABASE_TYPE=postgres
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=smtp_server
+POSTGRES_USER=smtp_user
+POSTGRES_PASSWORD=your_secure_password
+
+# Redis
+REDIS_URL=redis://redis:6379
+
+# API Configuration
+API_PORT=4000
+TRACKING_PORT=3000
+
+# Security
+JWT_SECRET=your-super-secret-jwt-key-change-this
+CORS_ORIGIN=https://your-domain.com
+API_KEY_REQUIRED=true
+API_KEY=your-api-key
+
+# Email Tracking
+TRACKING_DOMAIN=https://your-domain.com
+ENABLE_EMAIL_TRACKING=true
+ENABLE_OPEN_TRACKING=true
+ENABLE_CLICK_TRACKING=true
+
+# Monitoring
+ENABLE_HEALTH_CHECKS=true
+LOG_LEVEL=info
 ```
 
-#### Using as MCP Server
+## 🔐 Supabase Integration with User Authentication
 
-Connect your MCP-compatible client (like Claude Desktop) to use the server with tools like:
-- `send-email`
-- `send-bulk-emails`
-- `get-smtp-configs`
-- `add-smtp-config`
-- `get-email-templates`
-- `add-email-template`
+### Database Schema for Multi-User Support
 
-## 🔧 Configuration
+```sql
+-- Enable Row Level Security
+ALTER DATABASE smtp_server SET row_security = on;
 
-### SMTP Configuration Object
+-- User SMTP configurations table
+CREATE TABLE user_smtp_configs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL, -- References Supabase auth.users(id)
+  name VARCHAR(255) NOT NULL,
+  host VARCHAR(255) NOT NULL,
+  port INTEGER NOT NULL DEFAULT 587,
+  secure BOOLEAN DEFAULT false,
+  username VARCHAR(255) NOT NULL,
+  password_encrypted TEXT NOT NULL,
+  is_default BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, name)
+);
+
+-- Create indexes
+CREATE INDEX idx_user_smtp_configs_user_id ON user_smtp_configs(user_id);
+CREATE INDEX idx_user_smtp_configs_is_default ON user_smtp_configs(user_id, is_default) WHERE is_default = true;
+
+-- Row Level Security policies
+ALTER TABLE user_smtp_configs ENABLE ROW LEVEL SECURITY;
+
+-- Users can only access their own SMTP configs
+CREATE POLICY "Users can manage own SMTP configs" ON user_smtp_configs
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- Function to set current user context
+CREATE OR REPLACE FUNCTION set_current_user_id(user_uuid UUID)
+RETURNS void AS $$
+BEGIN
+  PERFORM set_config('app.current_user_id', user_uuid::text, true);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Authentication Middleware for SMTP Server
+
+Add to `src/middleware/auth.ts`:
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+import { Request, Response, NextFunction } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+  user?: any;
+}
+
+export const authenticateUser = async (
+  req: AuthenticatedRequest, 
+  res: Response, 
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+    
+    const token = authHeader.substring(7);
+    
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY!
+    );
+    
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    req.userId = user.id;
+    req.user = user;
+    
+    // Set user context for RLS
+    await supabase.rpc('set_current_user_id', { user_uuid: user.id });
+    
+    next();
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+};
+
+export const getUserSmtpConfig = async (userId: string, configId?: string) => {
+  const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+  
+  // Set user context for RLS
+  await supabase.rpc('set_current_user_id', { user_uuid: userId });
+  
+  let query = supabase
+    .from('user_smtp_configs')
+    .select('*')
+    .eq('is_active', true);
+  
+  if (configId) {
+    query = query.eq('id', configId);
+  } else {
+    query = query.eq('is_default', true);
+  }
+  
+  const { data, error } = await query.single();
+  
+  if (error || !data) {
+    throw new Error('SMTP configuration not found');
+  }
+  
+  // Decrypt password (implement your encryption/decryption logic)
+  const decryptedPassword = decrypt(data.password_encrypted);
+  
+  return {
+    id: data.id,
+    name: data.name,
+    host: data.host,
+    port: data.port,
+    secure: data.secure,
+    auth: {
+      user: data.username,
+      pass: decryptedPassword
+    }
+  };
+};
+```
+
+### Client Integration Example
+
+For AI agents using this SMTP server:
+
+```typescript
+// AI Agent Integration with Authentication
+class AuthenticatedEmailService {
+  private supabaseUrl = process.env.SUPABASE_URL!;
+  private supabaseKey = process.env.SUPABASE_ANON_KEY!;
+  private smtpApiUrl = process.env.SMTP_API_URL!;
+  
+  async sendEmailForUser(userToken: string, emailData: any) {
+    try {
+      // Validate user token
+      const supabase = createClient(this.supabaseUrl, this.supabaseKey);
+      const { data: { user } } = await supabase.auth.getUser(userToken);
+      
+      if (!user) {
+        throw new Error('Invalid user authentication');
+      }
+      
+      // Send email via SMTP MCP server
+      const response = await fetch(`${this.smtpApiUrl}/api/user/email/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`
+        },
+        body: JSON.stringify(emailData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Email sending failed: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Email sending error:', error);
+      throw error;
+    }
+  }
+  
+  async getUserEmailAnalytics(userToken: string, dateRange?: { from: string; to: string }) {
+    const response = await fetch(`${this.smtpApiUrl}/api/user/analytics`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${userToken}`
+      }
+    });
+    
+    return await response.json();
+  }
+}
+```
+
+### MCP Tool with Authentication
+
 ```json
 {
-  "id": "unique-identifier",
-  "name": "Human-readable name",
+  "name": "send-authenticated-email",
+  "description": "Send email using authenticated user's SMTP configuration",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "userToken": {
+        "type": "string",
+        "description": "JWT token from Supabase Auth"
+      },
+      "to": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "email": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        }
+      },
+      "subject": { "type": "string" },
+      "body": { "type": "string" },
+      "smtpConfigId": {
+        "type": "string",
+        "description": "Optional: specific SMTP config ID (uses default if not provided)"
+      }
+    },
+    "required": ["userToken", "to", "subject", "body"]
+  }
+}
+```
+
+## 📡 API Endpoints with Authentication
+
+### User Authentication Required
+
+```bash
+# Get user's SMTP configurations
+GET /api/user/smtp-configs
+Authorization: Bearer <supabase-jwt-token>
+
+# Create user SMTP configuration
+POST /api/user/smtp-configs
+Authorization: Bearer <supabase-jwt-token>
+{
+  "name": "My Gmail",
+  "host": "smtp.gmail.com",
+  "port": 587,
+  "secure": false,
+  "username": "user@gmail.com",
+  "password": "app-password",
+  "is_default": true
+}
+
+# Send email using user's SMTP config
+POST /api/user/email/send
+Authorization: Bearer <supabase-jwt-token>
+{
+  "to": [{"email": "recipient@example.com", "name": "John Doe"}],
+  "subject": "Test Email",
+  "body": "<h1>Hello from authenticated user!</h1>",
+  "smtpConfigId": "optional-config-id"
+}
+
+# Get user's email analytics
+GET /api/user/analytics?from=2025-01-01&to=2025-01-31
+Authorization: Bearer <supabase-jwt-token>
+
+# Get user's sent emails
+GET /api/user/emails?page=1&limit=50
+Authorization: Bearer <supabase-jwt-token>
+```
+
+### Integration Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AI Agent / Web App                      │
+│               (with Supabase Auth)                         │
+└─────────────────┬───────────────────────────────────────────┘
+                  │ JWT Token
+                  │
+┌─────────────────▼───────────────────────────────────────────┐
+│                 SMTP MCP Server                            │
+│                                                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐│
+│  │    Auth     │  │   Email      │  │     Tracking        ││
+│  │ Middleware  │  │   Service    │  │   & Analytics       ││
+│  └─────────────┘  └──────────────┘  └─────────────────────┘│
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────────┐
+│                    Supabase                                │
+│                                                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐│
+│  │    Auth     │  │  PostgreSQL  │  │    Row Level        ││
+│  │   Users     │  │   Database   │  │    Security         ││
+│  └─────────────┘  └──────────────┘  └─────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🧪 Testing the Complete Setup
+
+Let's test the Docker deployment:
+
   "host": "smtp.example.com",
   "port": 587,
   "secure": false,

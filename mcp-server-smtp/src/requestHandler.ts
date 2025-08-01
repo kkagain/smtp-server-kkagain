@@ -25,6 +25,223 @@ import {
 import { logToFile } from "./index.js";
 
 /**
+ * @swagger
+ * /api/send-email:
+ *   post:
+ *     tags: [Email]
+ *     summary: Send an email
+ *     description: Send a single email with optional templates and attachments
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - BearerAuth: []
+ *       - {}
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SendEmailRequest'
+ *           examples:
+ *             simple:
+ *               summary: Simple email
+ *               value:
+ *                 to: [{ email: "user@example.com", name: "John Doe" }]
+ *                 subject: "Test Email"
+ *                 body: "<h1>Hello World!</h1>"
+ *             template:
+ *               summary: Email with template
+ *               value:
+ *                 to: [{ email: "user@example.com", name: "John Doe" }]
+ *                 templateId: "welcome-template"
+ *                 templateData: { name: "John", company: "Acme Corp" }
+ *     responses:
+ *       200:
+ *         description: Email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Invalid request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ * 
+ * /api/send-bulk-emails:
+ *   post:
+ *     tags: [Email]
+ *     summary: Send bulk emails
+ *     description: Send multiple emails with rate limiting and batch processing
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - BearerAuth: []
+ *       - {}
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               emails:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/SendEmailRequest'
+ *               rateLimitDelay:
+ *                 type: number
+ *                 example: 1000
+ *                 description: Delay between emails in milliseconds
+ *     responses:
+ *       200:
+ *         description: Bulk emails processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 sent:
+ *                   type: number
+ *                 failed:
+ *                   type: number
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ * 
+ * /api/smtp-configs:
+ *   get:
+ *     tags: [SMTP Config]
+ *     summary: Get SMTP configurations
+ *     description: Retrieve all SMTP server configurations
+ *     responses:
+ *       200:
+ *         description: List of SMTP configurations
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SMTPConfig'
+ *   post:
+ *     tags: [SMTP Config]
+ *     summary: Save SMTP configuration
+ *     description: Create or update an SMTP server configuration
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SMTPConfig'
+ *     responses:
+ *       200:
+ *         description: Configuration saved successfully
+ * 
+ * /api/templates:
+ *   get:
+ *     tags: [Templates]
+ *     summary: Get email templates
+ *     description: Retrieve all email templates
+ *     responses:
+ *       200:
+ *         description: List of email templates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/EmailTemplate'
+ *   post:
+ *     tags: [Templates]
+ *     summary: Save email template
+ *     description: Create or update an email template
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/EmailTemplate'
+ *     responses:
+ *       200:
+ *         description: Template saved successfully
+ * 
+ * /api/templates/{templateId}:
+ *   delete:
+ *     tags: [Templates]
+ *     summary: Delete email template
+ *     description: Delete a specific email template
+ *     parameters:
+ *       - in: path
+ *         name: templateId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template ID to delete
+ *     responses:
+ *       200:
+ *         description: Template deleted successfully
+ * 
+ * /api/tools:
+ *   get:
+ *     tags: [Tools]
+ *     summary: Get MCP tools
+ *     description: Retrieve all available MCP tools and their descriptions
+ *     responses:
+ *       200:
+ *         description: List of available tools
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tools:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       inputSchema:
+ *                         type: object
+ * 
+ * /api/health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Health check
+ *     description: Check server health and status
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "healthy"
+ *                 timestamp:
+ *                   type: string
+ *                   example: "2024-01-01T00:00:00.000Z"
+ *                 uptime:
+ *                   type: number
+ *                   example: 3600
+ *                 version:
+ *                   type: string
+ *                   example: "1.0.0"
+ */
+
+/**
  * Generate a UUID
  */
 function generateUUID(): string {
