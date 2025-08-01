@@ -4,7 +4,7 @@ services:
   smtp-mcp-server:
     build: .
     ports:
-      - "3007:3007"
+      - "3008:3007"
     environment:
       - NODE_ENV=production
       - PORT=3007

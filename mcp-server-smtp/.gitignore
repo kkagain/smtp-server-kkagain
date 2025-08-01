@@ -49,6 +49,62 @@ typings/
 # Optional eslint cache
 .eslintcache
 
+# Python virtual environments (for Langchain integration)
+venv/
+env/
+.env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Langchain specific
+.langchain/
+langchain_cache/
+
+# AI/ML model files
+*.pkl
+*.joblib
+*.h5
+*.pb
+models/
+checkpoints/
+
+# Test files and test data
+test_*.json
+test_*.js
+test_*.ts
+test-*.json
+test-*.js
+test-*.ts
+*.test.json
+testing/
+test-data/
+test-results/
+test-output/
+
+# Email attachments and uploads
+uploads/
+attachments/
+email-attachments/
+temp-files/
+
 # Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/

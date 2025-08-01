@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  smtp-server:
+    build: ./mcp-server-smtp
+    ports:
+      - "3007:3007"  # MCP/HTTP Server
+      - "4000:4000"  # API Server
+      - "3000:3000"  # Tracking Server
+    environment:
+      - NODE_ENV=production
+      - SERVER_MODE=api
+      - DATABASE_TYPE=postgres
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=smtp_server
+      - POSTGRES_USER=smtp_user
+      - POSTGRES_PASSWORD=secure_password_change_this
+      - JWT_SECRET=your-super-secret-jwt-key-change-this
+      - API_PORT=4000
+      - TRACKING_PORT=3000
+      - ENABLE_EMAIL_TRACKING=true
+      - ENABLE_OPEN_TRACKING=true
+      - ENABLE_CLICK_TRACKING=true
+      - TRACKING_DOMAIN=http://localhost:3000
+      - CORS_ORIGIN=*
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - smtp-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: smtp_server
+      POSTGRES_USER: smtp_user
+      POSTGRES_PASSWORD: secure_password_change_this
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./mcp-server-smtp/database/schema.sql:/docker-entrypoint-initdb.d/01-init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - smtp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smtp_user -d smtp_server"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - smtp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - smtp-network
+    profiles:
+      - tools
+
+  # Optional: pgAdmin for PostgreSQL management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - smtp-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  smtp-network:
+    driver: bridge

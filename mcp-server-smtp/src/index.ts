@@ -16,10 +16,13 @@ import {
   handleGetEmailLogs
 } from "./requestHandler.js";
 import { ensureConfigDirectories } from "./config.js";
+import { setupSwagger } from "./swagger.js";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as http from 'http';
+import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -77,110 +80,127 @@ async function runServer() {
     // Setup request handlers for stdio transport
     await setupRequestHandlers(server, TOOLS);
 
-    // Create transport and connect for stdio
+    // Start stdio transport for MCP
     const transport = new StdioServerTransport();
     await server.connect(transport);
+    logToFile("SMTP MCP Server started with stdio transport");
 
-    logToFile("SMTP MCP Server (stdio) started successfully");
+    // HTTP Server for REST API and Swagger Documentation
+    const app = express();
+    const port = parseInt(process.env.PORT || '3007');
     
-    // Create an HTTP server to expose the API
-    const port = process.env.PORT || 3007;
-    const httpServer = http.createServer(async (req, res) => {
-      try {
-        // Set CORS headers
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // Middleware
+    app.use(cors());
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-        if (req.method === 'OPTIONS') {
-          res.writeHead(204);
-          res.end();
-          return;
-        }
+    // Setup Swagger documentation
+    setupSwagger(app);
 
-        const urlParts = req.url?.split('/').filter(p => p) || [];
-        const toolName = urlParts[1];
+    // API routes with error handling wrapper
+    const asyncHandler = (fn: (req: any, res: any) => Promise<any>) => (req: any, res: any) => {
+      Promise.resolve(fn(req, res)).catch((error) => {
+        logToFile(`API Error: ${error}`);
+        res.status(500).json({ error: 'Internal Server Error', details: error.message });
+      });
+    };
 
-        let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
-        req.on('end', async () => {
-          try {
-            const params = body ? JSON.parse(body) : {};
-            let result;
+    // API Routes
+    app.post('/api/send-email', asyncHandler(async (req, res) => {
+      const result = await handleSendEmail(req.body);
+      res.json(result);
+    }));
 
-            switch (toolName) {
-              case 'send-email':
-                result = await handleSendEmail(params);
-                break;
-              case 'send-bulk-emails':
-                result = await handleSendBulkEmails(params);
-                break;
-              case 'get-smtp-configs':
-                result = await handleGetSmtpConfigs();
-                break;
-              case 'add-smtp-config':
-                result = await handleAddSmtpConfig(params);
-                break;
-              case 'update-smtp-config':
-                result = await handleUpdateSmtpConfig(params);
-                break;
-              case 'delete-smtp-config':
-                result = await handleDeleteSmtpConfig(params);
-                break;
-              case 'get-email-templates':
-                result = await handleGetEmailTemplates();
-                break;
-              case 'add-email-template':
-                result = await handleAddEmailTemplate(params);
-                break;
-              case 'update-email-template':
-                result = await handleUpdateEmailTemplate(params);
-                break;
-              case 'delete-email-template':
-                result = await handleDeleteEmailTemplate(params);
-                break;
-              case 'get-email-logs':
-                result = await handleGetEmailLogs(params);
-                break;
-              case 'list-tools':
-                result = { tools: Object.values(TOOLS) };
-                break;
-              default:
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Tool not found' }));
-                return;
-            }
+    app.post('/api/send-bulk-emails', asyncHandler(async (req, res) => {
+      const result = await handleSendBulkEmails(req.body);
+      res.json(result);
+    }));
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result));
-          } catch (error) {
-            logToFile(`Error handling tool call: ${error}`);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Internal Server Error' }));
-          }
-        });
-      } catch (error) {
-        logToFile(`Error processing request: ${error}`);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal Server Error' }));
-      }
+    app.get('/api/smtp-configs', asyncHandler(async (req, res) => {
+      const result = await handleGetSmtpConfigs();
+      res.json(result);
+    }));
+
+    app.post('/api/smtp-configs', asyncHandler(async (req, res) => {
+      const result = await handleAddSmtpConfig(req.body);
+      res.json(result);
+    }));
+
+    app.put('/api/smtp-configs/:id', asyncHandler(async (req, res) => {
+      const result = await handleUpdateSmtpConfig({ ...req.body, id: req.params.id });
+      res.json(result);
+    }));
+
+    app.delete('/api/smtp-configs/:id', asyncHandler(async (req, res) => {
+      const result = await handleDeleteSmtpConfig({ id: req.params.id });
+      res.json(result);
+    }));
+
+    app.get('/api/templates', asyncHandler(async (req, res) => {
+      const result = await handleGetEmailTemplates();
+      res.json(result);
+    }));
+
+    app.post('/api/templates', asyncHandler(async (req, res) => {
+      const result = await handleAddEmailTemplate(req.body);
+      res.json(result);
+    }));
+
+    app.put('/api/templates/:id', asyncHandler(async (req, res) => {
+      const result = await handleUpdateEmailTemplate({ ...req.body, id: req.params.id });
+      res.json(result);
+    }));
+
+    app.delete('/api/templates/:templateId', asyncHandler(async (req, res) => {
+      const result = await handleDeleteEmailTemplate({ templateId: req.params.templateId });
+      res.json(result);
+    }));
+
+    app.get('/api/email-logs', asyncHandler(async (req, res) => {
+      const result = await handleGetEmailLogs(req.query);
+      res.json(result);
+    }));
+
+    app.get('/api/tools', asyncHandler(async (req, res) => {
+      res.json({ tools: Object.values(TOOLS) });
+    }));
+
+    app.get('/api/health', asyncHandler(async (req, res) => {
+      res.json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '1.0.0'
+      });
+    }));
+
+    // Root redirect to docs
+    app.get('/', (req, res) => {
+      res.redirect('/docs');
     });
 
-    httpServer.listen(port, () => {
+    // 404 handler
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Endpoint not found' });
+    });
+
+    // Start HTTP server
+    app.listen(port, () => {
       logToFile(`HTTP Server started on port ${port}`);
-      console.log(`SMTP MCP Server running on port ${port}. Press Ctrl+C to exit.`);
+      console.log(`🚀 SMTP MCP Server running on port ${port}`);
+      console.log(`📚 API Documentation: http://localhost:${port}/docs`);
+      console.log(`🏥 Health Check: http://localhost:${port}/api/health`);
+      console.log(`Press Ctrl+C to exit.`);
     });
     
     // Handle process termination
     process.on('SIGINT', () => {
       logToFile("Server shutting down due to SIGINT");
-      httpServer.close();
       process.exit(0);
     });
     
     process.on('SIGTERM', () => {
       logToFile("Server shutting down due to SIGTERM");
-      httpServer.close();
       process.exit(0);
     });
     
