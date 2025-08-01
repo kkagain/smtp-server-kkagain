@@ -165,6 +165,18 @@ build/
 config/smtp-configs.json
 config/email-templates.json
 config/email-logs.json
+gmail-config.json
+real-test-email.json
+test-smtp-config.json
+*-config.json
+*config*.json
+*.credentials.json
+
+# Sensitive files
+smtp-credentials.json
+email-credentials.json
+api-keys.json
+secrets.json
 
 # OS specific
 .DS_Store
