@@ -161,6 +161,27 @@ async function runServer() {
       res.json(result);
     }));
 
+    // Template endpoint aliases for backward compatibility
+    app.get('/api/get-email-templates', asyncHandler(async (req, res) => {
+      const result = await handleGetEmailTemplates();
+      res.json(result);
+    }));
+
+    app.post('/api/add-email-template', asyncHandler(async (req, res) => {
+      const result = await handleAddEmailTemplate(req.body);
+      res.json(result);
+    }));
+
+    app.put('/api/update-email-template/:id', asyncHandler(async (req, res) => {
+      const result = await handleUpdateEmailTemplate({ ...req.body, id: req.params.id });
+      res.json(result);
+    }));
+
+    app.delete('/api/delete-email-template/:templateId', asyncHandler(async (req, res) => {
+      const result = await handleDeleteEmailTemplate({ templateId: req.params.templateId });
+      res.json(result);
+    }));
+
     app.get('/api/tools', asyncHandler(async (req, res) => {
       res.json({ tools: Object.values(TOOLS) });
     }));
@@ -171,6 +192,35 @@ async function runServer() {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         version: '1.0.0'
+      });
+    }));
+
+    // List all available endpoints
+    app.get('/api/endpoints', asyncHandler(async (req, res) => {
+      res.json({
+        message: 'SMTP MCP Server - Available API Endpoints',
+        endpoints: {
+          health: 'GET /api/health',
+          tools: 'GET /api/tools',
+          email: {
+            send: 'POST /api/send-email',
+            sendBulk: 'POST /api/send-bulk-emails'
+          },
+          templates: {
+            getAll: 'GET /api/templates OR /api/get-email-templates',
+            add: 'POST /api/templates OR /api/add-email-template', 
+            update: 'PUT /api/templates/:id OR /api/update-email-template/:id',
+            delete: 'DELETE /api/templates/:templateId OR /api/delete-email-template/:templateId'
+          },
+          smtpConfigs: {
+            getAll: 'GET /api/smtp-configs',
+            add: 'POST /api/smtp-configs',
+            update: 'PUT /api/smtp-configs/:id',
+            delete: 'DELETE /api/smtp-configs/:id'
+          },
+          logs: 'GET /api/email-logs',
+          documentation: 'GET /docs'
+        }
       });
     }));
 

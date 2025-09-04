@@ -722,6 +722,15 @@ Authorization: Bearer <supabase-jwt-token>
 
 Let's test the Docker deployment:
 
+> **📋 Complete Test Commands**: For a comprehensive list of all curl commands and test scenarios, see **[Test_Commands.md](./Test_Commands.md)** which includes:
+> - ✅ Server health checks
+> - ✅ SMTP configuration management  
+> - ✅ Template CRUD operations
+> - ✅ Email sending with CC/BCC
+> - ✅ Template-based emails with variable substitution
+> - ✅ PowerShell formatting commands
+> - ✅ JSON file examples for complex requests
+
   "host": "smtp.example.com",
   "port": 587,
   "secure": false,
@@ -742,6 +751,44 @@ Let's test the Docker deployment:
   "body": "<h1>Welcome {{userName}}!</h1><p>Thanks for joining {{companyName}}.</p>",
   "variables": ["userName", "companyName"]
 }
+```
+
+### Template Features
+- **Variable Substitution**: Use `{{variableName}}` syntax in subject and body
+- **HTML Support**: Full HTML formatting in email templates
+- **Template Management**: Complete CRUD operations via API
+- **Dual Endpoints**: Both `/api/templates/*` and `/api/*-email-template/*` endpoints
+- **Default Templates**: Pre-loaded business outreach, newsletter, and default templates
+
+### Template Usage Examples
+
+**Create Template with Variables:**
+```bash
+curl -X POST "http://localhost:3008/api/add-email-template" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Welcome Email",
+    "subject": "Welcome {{name}} to {{company}}!",
+    "body": "<h1>Hello {{name}}!</h1><p>Welcome to {{company}}. Your role: {{role}}</p>",
+    "isDefault": false
+  }'
+```
+
+**Send Email Using Template:**
+```bash
+curl -X POST "http://localhost:3008/api/send-email" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": [{"email": "user@example.com", "name": "John Doe"}],
+    "templateId": "welcome-email",
+    "templateData": {
+      "name": "John",
+      "company": "TechCorp", 
+      "role": "Developer"
+    },
+    "cc": [{"email": "manager@example.com"}],
+    "bcc": [{"email": "hr@example.com"}]
+  }'
 ```
 
 ## 📚 API Reference
@@ -766,10 +813,32 @@ Let's test the Docker deployment:
 
 All HTTP endpoints follow the pattern: `POST /api/{tool-name}`
 
-Examples:
-- `POST /api/send-email`
-- `POST /api/get-smtp-configs`
-- `GET /api/list-tools` (to see available tools)
+**Core Email Endpoints:**
+- `POST /api/send-email` - Send single email
+- `POST /api/send-bulk-emails` - Send bulk emails
+- `GET /api/list-tools` - List available tools
+
+**SMTP Configuration Endpoints:**
+- `GET /api/smtp-configs` - List SMTP configurations  
+- `POST /api/smtp-configs` - Add SMTP configuration
+- `PUT /api/smtp-configs/{id}` - Update SMTP configuration
+- `DELETE /api/smtp-configs/{id}` - Delete SMTP configuration
+
+**Template Management Endpoints:**
+- `GET /api/templates` - List email templates
+- `POST /api/templates` - Add email template
+- `PUT /api/templates/{id}` - Update email template
+- `DELETE /api/templates/{id}` - Delete email template
+
+**Template Alias Endpoints (Alternative URLs):**
+- `GET /api/get-email-templates` - List email templates (alias)
+- `POST /api/add-email-template` - Add email template (alias)
+- `PUT /api/update-email-template/{id}` - Update email template (alias)
+- `DELETE /api/delete-email-template/{id}` - Delete email template (alias)
+
+**System Endpoints:**
+- `GET /api/health` - Server health check
+- `GET /api/endpoints` - List all available endpoints
 
 ## 🔒 Security Best Practices
 
