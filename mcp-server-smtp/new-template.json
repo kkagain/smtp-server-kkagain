@@ -1,0 +1,7 @@
+{
+  "id": "test-template-demo",
+  "name": "Demo Test Template",
+  "subject": "Test Template Demo - {{topic}}",
+  "body": "<h1>Hello {{recipient_name}}!</h1><p>This is a test template created via API to demonstrate template functionality.</p><p><strong>Topic:</strong> {{topic}}</p><p>Best regards,<br>{{sender_name}}</p>",
+  "isDefault": false
+}
