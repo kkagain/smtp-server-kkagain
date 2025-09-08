@@ -46,16 +46,16 @@ RUN mkdir -p /app/logs && \
 USER nextjs
 
 # Expose port
-EXPOSE 3007
+EXPOSE 3008
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3007
+ENV PORT=3008
 ENV LOG_LEVEL=info
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const http = require('http'); const options = { host: 'localhost', port: process.env.PORT || 3007, path: '/api/health', timeout: 2000 }; const req = http.request(options, (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1); }); req.on('error', () => process.exit(1)); req.end();"
+  CMD node -e "const http = require('http'); const options = { host: 'localhost', port: process.env.PORT || 3008, path: '/api/health', timeout: 2000 }; const req = http.request(options, (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1); }); req.on('error', () => process.exit(1)); req.end();"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

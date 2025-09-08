@@ -93,11 +93,19 @@ test_*.ts
 test-*.json
 test-*.js
 test-*.ts
+test-*.ps1
+test-*.sh
 *.test.json
+*.test.js
+*.test.ts
 testing/
 test-data/
 test-results/
 test-output/
+Test_*.md
+TEST-*.md
+*test*.json
+real-test-*.json
 
 # Email attachments and uploads
 uploads/

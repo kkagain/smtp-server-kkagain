@@ -178,6 +178,14 @@ module.exports = {
 
 ## Environment Configuration
 
+### ✅ SMTP Environment Variable Priority
+
+**Important**: The server now automatically prioritizes environment variables over stored configurations. This means:
+
+- **No API configuration needed** - SMTP works immediately when environment variables are set
+- **Perfect for VPS deployment** - just set SMTP credentials in `.env`
+- **Automatic fallback** - uses database configuration if environment variables are not set
+
 ### 1. Production Environment File
 
 Create `.env.production`:
@@ -191,7 +199,7 @@ PORT=3008
 DATABASE_TYPE=postgresql
 DATABASE_URL=postgresql://smtp_user:secure_password@localhost:5432/smtp_production
 
-# SMTP Configuration
+# SMTP Configuration (Automatically used - no API setup required!)
 SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -526,6 +534,58 @@ enabled = true
 EOF
 
 sudo systemctl restart fail2ban
+```
+
+## 📋 Template Management
+
+### Dual Endpoint Support
+
+Your server provides **dual endpoint support** for templates:
+
+#### Original Endpoints:
+- `POST /api/templates` - Create template
+- `GET /api/templates` - List templates
+- `GET /api/templates/:id` - Get template
+- `PUT /api/templates/:id` - Update template
+- `DELETE /api/templates/:id` - Delete template
+
+#### Alias Endpoints (same functionality):
+- `POST /api/template` - Create template
+- `GET /api/template` - List templates
+- `GET /api/template/:id` - Get template
+- `PUT /api/template/:id` - Update template
+- `DELETE /api/template/:id` - Delete template
+
+### Creating and Using Templates
+
+```bash
+# Create a welcome email template
+curl -X POST https://your-domain.com/api/templates \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "name": "welcome_email",
+    "subject": "Welcome {{name}}!",
+    "html": "<h1>Welcome {{name}}!</h1><p>Thanks for joining {{company}}.</p>",
+    "text": "Welcome {{name}}! Thanks for joining {{company}}."
+  }'
+
+# Send email using template
+curl -X POST https://your-domain.com/api/email/send-template \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "templateId": 1,
+    "to": "user@example.com",
+    "variables": {
+      "name": "John Doe",
+      "company": "ACME Corp"
+    }
+  }'
+
+# List all templates
+curl -H "X-API-Key: your-api-key" \
+     https://your-domain.com/api/templates
 ```
 
 ## Troubleshooting
