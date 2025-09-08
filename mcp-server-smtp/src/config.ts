@@ -176,9 +176,28 @@ export async function getSmtpConfigs(): Promise<SmtpServerConfig[]> {
 }
 
 /**
- * Get default SMTP configuration
+ * Get default SMTP configuration with environment variable priority
  */
 export async function getDefaultSmtpConfig(): Promise<SmtpServerConfig> {
+  // First, check if environment variables are set for SMTP
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const envSmtpConfig: SmtpServerConfig = {
+      id: 'env-smtp',
+      name: 'Environment SMTP',
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      isDefault: true
+    };
+    logToFile(`Using SMTP configuration from environment variables: ${envSmtpConfig.host}`);
+    return envSmtpConfig;
+  }
+  
+  // Fallback to stored configurations
   const configs = await getSmtpConfigs();
   return configs.find(config => config.isDefault) || configs[0] || DEFAULT_SMTP_CONFIG.smtpServers[0];
 }

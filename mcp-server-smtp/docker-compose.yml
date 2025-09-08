@@ -4,19 +4,34 @@ services:
   smtp-mcp-server:
     build: .
     ports:
-      - "3008:3007"
+      - "3008:3008"
     environment:
       - NODE_ENV=production
-      - PORT=3007
+      - PORT=3008
       - LOG_LEVEL=info
+      - DATABASE_TYPE=sqlite
+      - SQLITE_DB_PATH=./data/smtp-server.db
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_SECURE=false
+      # Note: Add your SMTP credentials via .env file or docker-compose.override.yml
+      # - SMTP_USER=your-email@gmail.com
+      # - SMTP_PASS=your-app-password
+      - JWT_SECRET=your-super-secret-jwt-key-change-this
+      - ENABLE_TEMPLATES=true
+      - ENABLE_RATE_LIMITING=true
+      - ENABLE_BULK_EMAIL=true
+      - ENABLE_SWAGGER=true
     volumes:
       # Mount config directory for persistent SMTP configurations
       - ./config:/app/config
       # Mount logs directory for persistent logs
       - ./logs:/app/logs
+      # Mount data directory for SQLite database
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/api/list-tools"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3008/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

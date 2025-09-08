@@ -27,6 +27,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Integration Guides',
       items: [
+        'integration/application-integration',
         'integration/ai-agents',
         'integration/langchain-guide',
         'integration/quick-reference',
