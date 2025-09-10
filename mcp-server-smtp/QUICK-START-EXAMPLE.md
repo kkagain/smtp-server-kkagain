@@ -17,6 +17,13 @@ npm install express dotenv node-fetch
 # .env file in your app
 SMTP_SERVER_URL=https://your-domain.com
 SMTP_SERVER_API_KEY=your-api-key
+
+# Your own SMTP credentials (the server will use these!)
+MY_SMTP_HOST=smtp.gmail.com
+MY_SMTP_PORT=587
+MY_SMTP_SECURE=false
+MY_SMTP_USER=your-email@gmail.com
+MY_SMTP_PASS=your-gmail-app-password
 ```
 
 ### 3. Email Service (emailService.js)
@@ -32,6 +39,15 @@ class EmailService {
       'Content-Type': 'application/json',
       'X-API-Key': this.apiKey
     };
+    
+    // Your own SMTP configuration
+    this.mySmtpConfig = {
+      host: process.env.MY_SMTP_HOST,
+      port: parseInt(process.env.MY_SMTP_PORT) || 587,
+      secure: process.env.MY_SMTP_SECURE === 'true',
+      user: process.env.MY_SMTP_USER,
+      pass: process.env.MY_SMTP_PASS
+    };
   }
 
   async sendEmail(to, subject, text, html = null) {
@@ -39,7 +55,12 @@ class EmailService {
       const response = await fetch(`${this.baseUrl}/api/email/send`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify({ to, subject, text, html })
+        body: JSON.stringify({ 
+          to: Array.isArray(to) ? to : [typeof to === 'string' ? { email: to } : to],
+          subject, 
+          body: html || text,
+          smtpConfig: this.mySmtpConfig // Use your own SMTP credentials!
+        })
       });
 
       if (!response.ok) {
@@ -47,7 +68,7 @@ class EmailService {
       }
 
       const result = await response.json();
-      console.log('✅ Email sent:', result.messageId);
+      console.log('✅ Email sent with your SMTP:', result.messageId);
       return result;
     } catch (error) {
       console.error('❌ Email failed:', error.message);
@@ -60,7 +81,12 @@ class EmailService {
       const response = await fetch(`${this.baseUrl}/api/email/send-template`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify({ templateId, to, variables })
+        body: JSON.stringify({ 
+          templateId, 
+          to, 
+          variables,
+          smtpConfig: this.mySmtpConfig // Use your own SMTP credentials!
+        })
       });
 
       if (!response.ok) {
@@ -68,7 +94,7 @@ class EmailService {
       }
 
       const result = await response.json();
-      console.log('✅ Template email sent:', result.messageId);
+      console.log('✅ Template email sent with your SMTP:', result.messageId);
       return result;
     } catch (error) {
       console.error('❌ Template email failed:', error.message);
@@ -218,13 +244,21 @@ curl -X POST http://localhost:3000/forgot-password \
 ## 🎯 How It Works
 
 ```
-Your App (localhost:3000)  →  HTTP Request  →  SMTP Server (VPS)  →  Gmail/Email Provider
+Your App (localhost:3000)  →  HTTP Request + Your SMTP Credentials  →  SMTP Server (VPS)  →  Your Email Provider
 ```
 
 1. **Your app** receives a request (user registration, password reset, etc.)
-2. **Your app** calls your SMTP server via HTTP API
-3. **SMTP server** processes the request and sends email via configured provider
+2. **Your app** calls your SMTP server via HTTP API **with your own SMTP credentials**
+3. **SMTP server** uses **your credentials** to send email via **your email provider**
 4. **Response** returns with success/failure and message ID
+
+## 🔑 **Key Benefit: Use Your Own SMTP**
+
+- ✅ **Your app** provides SMTP credentials with each request
+- ✅ **SMTP server** acts as a relay using **your credentials**
+- ✅ **No server configuration** needed - credentials come from your app
+- ✅ **Multiple apps** can use different SMTP providers
+- ✅ **Dynamic switching** between email providers
 
 ## ✅ Key Benefits
 

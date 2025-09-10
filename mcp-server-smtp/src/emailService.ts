@@ -21,6 +21,7 @@ export interface EmailData {
   bcc?: EmailRecipient[];
   templateId?: string;
   templateData?: Record<string, any>;
+  smtpConfig?: DynamicSmtpConfig; // Dynamic SMTP configuration
 }
 
 // Interface for bulk email data
@@ -38,6 +39,7 @@ export interface BulkEmailData {
   templateData?: Record<string, any>;
   batchSize?: number;
   delayBetweenBatches?: number; // in milliseconds
+  smtpConfig?: DynamicSmtpConfig; // Dynamic SMTP configuration
 }
 
 // Rate limiting state
@@ -47,32 +49,51 @@ const rateLimitState = {
   resetTime: 0
 };
 
+// Interface for dynamic SMTP configuration
+export interface DynamicSmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+}
+
 /**
  * Create a nodemailer transport using SMTP config
  */
-export async function createTransport(smtpConfigId?: string) {
-  let smtpConfig: SmtpServerConfig;
+export async function createTransport(smtpConfigId?: string, dynamicConfig?: DynamicSmtpConfig) {
+  let smtpConfig: SmtpServerConfig | DynamicSmtpConfig;
   
-  if (smtpConfigId) {
+  // Priority: 1. Dynamic config from request, 2. Stored config by ID, 3. Default config
+  if (dynamicConfig) {
+    smtpConfig = dynamicConfig;
+    console.log('Using dynamic SMTP config from request');
+  } else if (smtpConfigId) {
     const configs = await getSmtpConfigs();
     const config = configs.find(c => c.id === smtpConfigId);
     if (!config) {
       throw new Error(`SMTP configuration with ID ${smtpConfigId} not found`);
     }
     smtpConfig = config;
+    console.log(`Using stored SMTP config: ${smtpConfigId}`);
   } else {
     smtpConfig = await getDefaultSmtpConfig();
+    console.log('Using default SMTP config');
   }
   
-  return nodemailer.createTransport({
+  // Handle both formats (stored config vs dynamic config)
+  const transportConfig = {
     host: smtpConfig.host,
     port: smtpConfig.port,
     secure: smtpConfig.secure,
     auth: {
-      user: smtpConfig.auth.user,
-      pass: smtpConfig.auth.pass
+      user: 'auth' in smtpConfig ? smtpConfig.auth.user : smtpConfig.user,
+      pass: 'auth' in smtpConfig ? smtpConfig.auth.pass : smtpConfig.pass
     }
-  });
+  };
+  
+  console.log(`Creating transport for: ${transportConfig.host}:${transportConfig.port}`);
+  return nodemailer.createTransport(transportConfig);
 }
 
 /**
@@ -150,10 +171,22 @@ function formatRecipients(recipients: EmailRecipient | EmailRecipient[]): string
  */
 export async function sendEmail(data: EmailData, smtpConfigId?: string): Promise<{ success: boolean; message?: string }> {
   try {
-    const transport = await createTransport(smtpConfigId);
-    const smtpConfig = smtpConfigId 
-      ? (await getSmtpConfigs()).find(c => c.id === smtpConfigId) 
-      : await getDefaultSmtpConfig();
+    // Use dynamic config from request if provided, otherwise use stored config
+    const transport = await createTransport(smtpConfigId, data.smtpConfig);
+    
+    let smtpConfig: SmtpServerConfig | DynamicSmtpConfig;
+    if (data.smtpConfig) {
+      smtpConfig = data.smtpConfig;
+    } else if (smtpConfigId) {
+      const configs = await getSmtpConfigs();
+      const config = configs.find(c => c.id === smtpConfigId);
+      if (!config) {
+        return { success: false, message: 'SMTP configuration not found' };
+      }
+      smtpConfig = config;
+    } else {
+      smtpConfig = await getDefaultSmtpConfig();
+    }
     
     if (!smtpConfig) {
       return { success: false, message: 'SMTP configuration not found' };
@@ -167,11 +200,14 @@ export async function sendEmail(data: EmailData, smtpConfigId?: string): Promise
       data.body
     );
     
+    // Get the default from email
+    const defaultFrom = 'auth' in smtpConfig ? smtpConfig.auth.user : smtpConfig.user;
+    
     // Create mail options
     const mailOptions = {
       from: data.from 
         ? (data.from.name ? `"${data.from.name}" <${data.from.email}>` : data.from.email)
-        : (smtpConfig.auth.user),
+        : defaultFrom,
       to: formatRecipients(data.to),
       subject,
       html: body,
@@ -185,9 +221,10 @@ export async function sendEmail(data: EmailData, smtpConfigId?: string): Promise
     // Log email activity
     const recipients = Array.isArray(data.to) ? data.to : [data.to];
     for (const recipient of recipients) {
+      const configId = 'id' in smtpConfig ? smtpConfig.id : 'dynamic';
       const logEntry: EmailLogEntry = {
         timestamp: new Date().toISOString(),
-        smtpConfig: smtpConfig.id,
+        smtpConfig: configId,
         templateId: data.templateId,
         recipient: recipient.email,
         subject,
@@ -270,7 +307,8 @@ export async function sendBulkEmails(data: BulkEmailData, smtpConfigId?: string)
               ...data.templateData,
               email: recipient.email,
               name: recipient.name || ''
-            }
+            },
+            smtpConfig: data.smtpConfig // Pass dynamic SMTP config
           };
           
           const result = await sendEmail(emailData, smtpConfigId);

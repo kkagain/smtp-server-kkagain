@@ -95,6 +95,7 @@ test-*.js
 test-*.ts
 test-*.ps1
 test-*.sh
+test-*.md
 *.test.json
 *.test.js
 *.test.ts
@@ -106,6 +107,8 @@ Test_*.md
 TEST-*.md
 *test*.json
 real-test-*.json
+example-*.json
+*example*.json
 
 # Email attachments and uploads
 uploads/

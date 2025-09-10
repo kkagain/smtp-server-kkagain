@@ -182,6 +182,33 @@ async function runServer() {
       res.json(result);
     }));
 
+    // Modern Email API Endpoints (with dynamic SMTP support)
+    app.post('/api/email/send', asyncHandler(async (req, res) => {
+      const result = await handleSendEmail(req.body);
+      res.json(result);
+    }));
+
+    app.post('/api/email/send-bulk', asyncHandler(async (req, res) => {
+      const result = await handleSendBulkEmails(req.body);
+      res.json(result);
+    }));
+
+    app.post('/api/email/send-template', asyncHandler(async (req, res) => {
+      // Convert template-based request to standard email format
+      const { templateId, to, variables, smtpConfig, ...otherParams } = req.body;
+      const emailData = {
+        to: Array.isArray(to) ? to : [typeof to === 'string' ? { email: to } : to],
+        subject: '', // Will be filled by template
+        body: '', // Will be filled by template
+        templateId,
+        templateData: variables,
+        smtpConfig,
+        ...otherParams
+      };
+      const result = await handleSendEmail(emailData);
+      res.json(result);
+    }));
+
     app.get('/api/tools', asyncHandler(async (req, res) => {
       res.json({ tools: Object.values(TOOLS) });
     }));

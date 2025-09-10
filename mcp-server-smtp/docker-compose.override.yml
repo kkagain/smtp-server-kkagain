@@ -1,0 +1,12 @@
+services:
+  smtp-mcp-server:
+    environment:
+      # SMTP credentials are now OPTIONAL - server supports dynamic SMTP per request
+      # Uncomment these only if you want fallback SMTP credentials:
+      # - SMTP_HOST=smtp.gmail.com
+      # - SMTP_PORT=587
+      # - SMTP_SECURE=false
+      # - SMTP_USER=bot.a3asolutions@gmail.com
+      # - SMTP_PASS=jnvh pqxj mbly nviy
+      - JWT_SECRET=your-super-secret-jwt-key-updated
+      - API_KEY=docker-test-api-key

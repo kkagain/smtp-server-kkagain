@@ -54,12 +54,15 @@ LOG_LEVEL=info
 DATABASE_TYPE=sqlite
 SQLITE_DB_PATH=./data/smtp-server.db
 
-# SMTP Configuration (Required)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-gmail-app-password
+# SMTP Configuration (OPTIONAL - NEW: Dynamic SMTP Support!)
+# The server now supports dynamic SMTP credentials per request!
+# These variables are optional fallback credentials.
+# Applications can send their own SMTP configuration with each request.
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=your-email@gmail.com
+# SMTP_PASS=your-gmail-app-password
 
 # Security (Change for production)
 JWT_SECRET=your-super-secret-jwt-key
@@ -113,6 +116,39 @@ docker-compose --profile postgres --profile redis --profile nginx up -d
 - **Redis** caching service
 - **Nginx** reverse proxy
 - **Service profiles** for selective deployment
+
+## 🎯 NEW: Dynamic SMTP Configuration
+
+The server now supports **dynamic SMTP credentials per request**! This means:
+
+- ✅ **No SMTP environment variables required** in Docker
+- ✅ **Applications send SMTP credentials** with each request
+- ✅ **Multiple applications** can use different SMTP providers
+- ✅ **True multi-tenant email service**
+
+### Example: Send Email with Dynamic SMTP
+
+```bash
+# No SMTP env vars needed in Docker - start the server:
+docker-compose up -d
+
+# Your application sends SMTP credentials with the request:
+curl -X POST http://localhost:3008/api/email/send \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-change-this" \
+  -d '{
+    "to": [{"email": "test@example.com"}],
+    "subject": "Dynamic SMTP Test",
+    "body": "This email uses SMTP credentials from your application!",
+    "smtpConfig": {
+      "host": "smtp.gmail.com",
+      "port": 587,
+      "secure": false,
+      "user": "your-email@gmail.com",
+      "pass": "your-gmail-app-password"
+    }
+  }'
+```
 
 ## 🧪 Testing Docker Deployment
 
