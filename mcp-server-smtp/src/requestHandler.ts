@@ -340,7 +340,8 @@ export async function handleSendEmail(parameters: any) {
       cc: parameters.cc,
       bcc: parameters.bcc,
       templateId: parameters.templateId,
-      templateData: parameters.templateData
+      templateData: parameters.templateData,
+      smtpConfig: parameters.smtpConfig // Support dynamic SMTP config
     };
     
     // Send the email
@@ -376,7 +377,8 @@ export async function handleSendBulkEmails(parameters: any) {
       templateId: parameters.templateId,
       templateData: parameters.templateData,
       batchSize: parameters.batchSize,
-      delayBetweenBatches: parameters.delayBetweenBatches
+      delayBetweenBatches: parameters.delayBetweenBatches,
+      smtpConfig: parameters.smtpConfig // Support dynamic SMTP config
     };
     
     // Send the bulk emails

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   smtp-mcp-server:
     build: .
@@ -11,13 +9,15 @@ services:
       - LOG_LEVEL=info
       - DATABASE_TYPE=sqlite
       - SQLITE_DB_PATH=./data/smtp-server.db
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_SECURE=false
-      # Note: Add your SMTP credentials via .env file or docker-compose.override.yml
+      # SMTP Environment Variables (OPTIONAL - server now supports dynamic SMTP per request)
+      # Uncomment if you want default SMTP fallback credentials:
+      # - SMTP_HOST=smtp.gmail.com
+      # - SMTP_PORT=587
+      # - SMTP_SECURE=false
       # - SMTP_USER=your-email@gmail.com
       # - SMTP_PASS=your-app-password
       - JWT_SECRET=your-super-secret-jwt-key-change-this
+      - API_KEY=your-api-key-change-this
       - ENABLE_TEMPLATES=true
       - ENABLE_RATE_LIMITING=true
       - ENABLE_BULK_EMAIL=true

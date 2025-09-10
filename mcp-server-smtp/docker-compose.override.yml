@@ -1,0 +1,12 @@
+services:
+  smtp-mcp-server:
+    environment:
+      # SMTP credentials are now OPTIONAL - server supports dynamic SMTP per request
+      # Uncomment these only if you want fallback SMTP credentials:
+      # - SMTP_HOST=smtp.gmail.com
+      # - SMTP_PORT=587
+      # - SMTP_SECURE=false
+      # - SMTP_USER=YOUR_EMAIL@gmail.com
+      # - SMTP_PASS=YOUR_GMAIL_APP_PASSWORD
+      - JWT_SECRET=your-super-secret-jwt-key-updated
+      - API_KEY=docker-test-api-key
