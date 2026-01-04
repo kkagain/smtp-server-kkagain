@@ -866,12 +866,57 @@ All HTTP endpoints follow the pattern: `POST /api/{tool-name}`
   Use the returned `imageUrl` in your email body.
   
   ```json
+  ```json
   {
     "to": "client@example.com",
     "subject": "Email with Image",
     "body": "<h1>Check this out</h1><img src='http://your-server:3007/public/images/img-1704381234-582.png' />"
   }
   ```
+
+  ## 🔔 Real-time Webhook Notifications (Mailspring-like Features)
+
+  Get instant notifications when your emails are opened or clicked, just like "Read Receipts" in Mailspring.
+
+  ### 1. Register a Webhook
+  Tell the server where to send notifications.
+  
+  **Endpoint:** `POST /api/webhooks`
+  **Tool:** `add-webhook`
+
+  ```json
+  {
+    "name": "My App Notification",
+    "url": "https://my-app.com/api/email-events",
+    "events": ["open", "click"],
+    "userId": "user-123"
+  }
+  ```
+
+  ### 2. Receive Events
+  Your server will receive a POST request when an event occurs:
+
+  ```json
+  {
+    "id": "1704381234567",
+    "event": "open",
+    "created_at": "2024-01-04T12:00:00.000Z",
+    "data": {
+      "email": "recipient@example.com",
+      "subject": "Hello World",
+      "messageId": "<...>",
+      "trackingId": "...",
+      "ip": "1.2.3.4",
+      "userAgent": "Mozilla/5.0...",
+      "country": "US",
+      "city": "New York"
+    }
+  }
+  ```
+
+  ### 3. Manage Webhooks
+  - List webhooks: `GET /api/webhooks` or `get-webhooks` tool
+  - Delete webhooks: `DELETE /api/webhooks` or `delete-webhook` tool
 
 ## 🔒 Security Best Practices
 
