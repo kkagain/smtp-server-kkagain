@@ -839,6 +839,39 @@ All HTTP endpoints follow the pattern: `POST /api/{tool-name}`
 **System Endpoints:**
 - `GET /api/health` - Server health check
 - `GET /api/endpoints` - List all available endpoints
+  
+  **Image Hosting Endpoints:**
+  - `POST /api/upload-image` - Upload an image for hosting
+  
+  ## 📸 Image Hosting & HTML Emails
+  
+  This server includes a built-in image hosting service, similar to Mailchimp, allowing you to upload images and use them in your HTML emails.
+  
+  ### 1. Upload an Image
+  Send a POST request to upload your image file.
+  
+  **Endpoint:** `POST /api/upload-image`
+  **Body:** `FormData` with key `image` (file)
+  
+  **Example Response:**
+  ```json
+  {
+    "success": true,
+    "imageUrl": "http://your-server:3007/public/images/img-1704381234-582.png",
+    "filename": "img-1704381234-582.png"
+  }
+  ```
+  
+  ### 2. Use in HTML Email
+  Use the returned `imageUrl` in your email body.
+  
+  ```json
+  {
+    "to": "client@example.com",
+    "subject": "Email with Image",
+    "body": "<h1>Check this out</h1><img src='http://your-server:3007/public/images/img-1704381234-582.png' />"
+  }
+  ```
 
 ## 🔒 Security Best Practices
 
