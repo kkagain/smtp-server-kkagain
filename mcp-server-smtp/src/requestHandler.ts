@@ -1,7 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { 
-  Tool, 
-  CallToolRequestSchema, 
+import {
+  Tool,
+  CallToolRequestSchema,
   ListToolsRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -245,7 +245,7 @@ import { logToFile } from "./index.js";
  * Generate a UUID
  */
 function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -285,37 +285,37 @@ export async function setupRequestHandlers(
       switch (toolName) {
         case "send-email":
           return await handleSendEmail(toolParams);
-        
+
         case "send-bulk-emails":
           return await handleSendBulkEmails(toolParams);
-        
+
         case "get-smtp-configs":
           return await handleGetSmtpConfigs();
-        
+
         case "add-smtp-config":
           return await handleAddSmtpConfig(toolParams);
-        
+
         case "update-smtp-config":
           return await handleUpdateSmtpConfig(toolParams);
-        
+
         case "delete-smtp-config":
           return await handleDeleteSmtpConfig(toolParams);
-        
+
         case "get-email-templates":
           return await handleGetEmailTemplates();
-        
+
         case "add-email-template":
           return await handleAddEmailTemplate(toolParams);
-        
+
         case "update-email-template":
           return await handleUpdateEmailTemplate(toolParams);
-        
+
         case "delete-email-template":
           return await handleDeleteEmailTemplate(toolParams);
-        
+
         case "get-email-logs":
           return await handleGetEmailLogs(toolParams);
-        
+
         default:
           throw new Error(`Tool '${toolName}' exists but no handler is implemented`);
       }
@@ -330,7 +330,7 @@ export async function handleSendEmail(parameters: any) {
   try {
     // If "to" is a single object, convert it to an array
     const to = Array.isArray(parameters.to) ? parameters.to : [parameters.to];
-    
+
     // Prepare the email data
     const emailData: EmailData = {
       to: to,
@@ -341,12 +341,13 @@ export async function handleSendEmail(parameters: any) {
       bcc: parameters.bcc,
       templateId: parameters.templateId,
       templateData: parameters.templateData,
-      smtpConfig: parameters.smtpConfig // Support dynamic SMTP config
+      smtpConfig: parameters.smtpConfig, // Support dynamic SMTP config
+      images: parameters.images // Support images for automatic hosting
     };
-    
+
     // Send the email
     const result = await sendEmail(emailData, parameters.smtpConfigId);
-    
+
     return {
       success: result.success,
       message: result.message
@@ -380,10 +381,10 @@ export async function handleSendBulkEmails(parameters: any) {
       delayBetweenBatches: parameters.delayBetweenBatches,
       smtpConfig: parameters.smtpConfig // Support dynamic SMTP config
     };
-    
+
     // Send the bulk emails
     const result = await sendBulkEmails(bulkEmailData, parameters.smtpConfigId);
-    
+
     return {
       success: result.success,
       totalSent: result.totalSent,
@@ -409,7 +410,7 @@ export async function handleSendBulkEmails(parameters: any) {
 export async function handleGetSmtpConfigs() {
   try {
     const configs = await getSmtpConfigs();
-    
+
     return {
       success: true,
       configs: configs
@@ -431,7 +432,7 @@ export async function handleAddSmtpConfig(parameters: any) {
   try {
     // Get existing configs
     const configs = await getSmtpConfigs();
-    
+
     // Create a new config
     const newConfig: SmtpServerConfig = {
       id: generateUUID(),
@@ -445,20 +446,20 @@ export async function handleAddSmtpConfig(parameters: any) {
       },
       isDefault: parameters.isDefault ?? false
     };
-    
+
     // If this is set as default, update other configs
     if (newConfig.isDefault) {
       configs.forEach(config => {
         config.isDefault = false;
       });
     }
-    
+
     // Add the new config to the list
     configs.push(newConfig);
-    
+
     // Save the updated configs
     await saveSmtpConfigs(configs);
-    
+
     return {
       success: true,
       config: newConfig
@@ -480,31 +481,31 @@ export async function handleUpdateSmtpConfig(parameters: any) {
   try {
     // Get existing configs
     const configs = await getSmtpConfigs();
-    
+
     // Find the config to update
     const configIndex = configs.findIndex(config => config.id === parameters.id);
-    
+
     if (configIndex === -1) {
       return {
         success: false,
         message: `SMTP configuration with ID ${parameters.id} not found`
       };
     }
-    
+
     // Update the config
     const updatedConfig = { ...configs[configIndex] };
-    
+
     if (parameters.name !== undefined) updatedConfig.name = parameters.name;
     if (parameters.host !== undefined) updatedConfig.host = parameters.host;
     if (parameters.port !== undefined) updatedConfig.port = parameters.port;
     if (parameters.secure !== undefined) updatedConfig.secure = parameters.secure;
     if (parameters.auth?.user !== undefined) updatedConfig.auth.user = parameters.auth.user;
     if (parameters.auth?.pass !== undefined) updatedConfig.auth.pass = parameters.auth.pass;
-    
+
     // Handle default flag
     if (parameters.isDefault !== undefined) {
       updatedConfig.isDefault = parameters.isDefault;
-      
+
       // If setting as default, update other configs
       if (updatedConfig.isDefault) {
         configs.forEach((config, index) => {
@@ -514,13 +515,13 @@ export async function handleUpdateSmtpConfig(parameters: any) {
         });
       }
     }
-    
+
     // Update the config in the list
     configs[configIndex] = updatedConfig;
-    
+
     // Save the updated configs
     await saveSmtpConfigs(configs);
-    
+
     return {
       success: true,
       config: updatedConfig
@@ -542,17 +543,17 @@ export async function handleDeleteSmtpConfig(parameters: any) {
   try {
     // Get existing configs
     const configs = await getSmtpConfigs();
-    
+
     // Find the config to delete
     const configIndex = configs.findIndex(config => config.id === parameters.id);
-    
+
     if (configIndex === -1) {
       return {
         success: false,
         message: `SMTP configuration with ID ${parameters.id} not found`
       };
     }
-    
+
     // Check if trying to delete the only config
     if (configs.length === 1) {
       return {
@@ -560,21 +561,21 @@ export async function handleDeleteSmtpConfig(parameters: any) {
         message: 'Cannot delete the only SMTP configuration'
       };
     }
-    
+
     // Check if deleting the default config
     const isDefault = configs[configIndex].isDefault;
-    
+
     // Remove the config from the list
     configs.splice(configIndex, 1);
-    
+
     // If deleting the default config, set another one as default
     if (isDefault && configs.length > 0) {
       configs[0].isDefault = true;
     }
-    
+
     // Save the updated configs
     await saveSmtpConfigs(configs);
-    
+
     return {
       success: true,
       message: 'SMTP configuration deleted successfully'
@@ -595,7 +596,7 @@ export async function handleDeleteSmtpConfig(parameters: any) {
 export async function handleGetEmailTemplates() {
   try {
     const templates = await getEmailTemplates();
-    
+
     return {
       success: true,
       templates: templates
@@ -617,7 +618,7 @@ export async function handleAddEmailTemplate(parameters: any) {
   try {
     // Get existing templates
     const templates = await getEmailTemplates();
-    
+
     // Create a new template
     const newTemplate: EmailTemplate = {
       id: generateUUID(),
@@ -626,7 +627,7 @@ export async function handleAddEmailTemplate(parameters: any) {
       body: parameters.body,
       isDefault: parameters.isDefault ?? false
     };
-    
+
     // If this is set as default, we'll need to update other templates
     if (newTemplate.isDefault) {
       templates.forEach(template => {
@@ -639,10 +640,10 @@ export async function handleAddEmailTemplate(parameters: any) {
         }
       });
     }
-    
+
     // Save the new template
     await saveEmailTemplate(newTemplate);
-    
+
     return {
       success: true,
       template: newTemplate
@@ -664,28 +665,28 @@ export async function handleUpdateEmailTemplate(parameters: any) {
   try {
     // Get existing templates
     const templates = await getEmailTemplates();
-    
+
     // Find the template to update
     const template = templates.find(t => t.id === parameters.id);
-    
+
     if (!template) {
       return {
         success: false,
         message: `Email template with ID ${parameters.id} not found`
       };
     }
-    
+
     // Update the template
     const updatedTemplate = { ...template };
-    
+
     if (parameters.name !== undefined) updatedTemplate.name = parameters.name;
     if (parameters.subject !== undefined) updatedTemplate.subject = parameters.subject;
     if (parameters.body !== undefined) updatedTemplate.body = parameters.body;
-    
+
     // Handle default flag
     if (parameters.isDefault !== undefined && parameters.isDefault !== template.isDefault) {
       updatedTemplate.isDefault = parameters.isDefault;
-      
+
       // If setting as default, update other templates
       if (updatedTemplate.isDefault) {
         templates.forEach(t => {
@@ -699,10 +700,10 @@ export async function handleUpdateEmailTemplate(parameters: any) {
         });
       }
     }
-    
+
     // Save the updated template
     await saveEmailTemplate(updatedTemplate);
-    
+
     return {
       success: true,
       template: updatedTemplate
@@ -724,17 +725,17 @@ export async function handleDeleteEmailTemplate(parameters: any) {
   try {
     // Get existing templates
     const templates = await getEmailTemplates();
-    
+
     // Find the template to delete
     const template = templates.find(t => t.id === parameters.id);
-    
+
     if (!template) {
       return {
         success: false,
         message: `Email template with ID ${parameters.id} not found`
       };
     }
-    
+
     // If deleting default template, make another one default
     if (template.isDefault && templates.length > 1) {
       const anotherTemplate = templates.find(t => t.id !== parameters.id);
@@ -743,10 +744,10 @@ export async function handleDeleteEmailTemplate(parameters: any) {
         await saveEmailTemplate(anotherTemplate);
       }
     }
-    
+
     // Delete the template
     await deleteEmailTemplate(parameters.id);
-    
+
     return {
       success: true,
       message: 'Email template deleted successfully'
@@ -765,29 +766,29 @@ export async function handleDeleteEmailTemplate(parameters: any) {
  * Handle get-email-logs tool call
  */
 export async function handleGetEmailLogs(parameters: any) {
-  const { limit, filterBySuccess } = parameters as { 
+  const { limit, filterBySuccess } = parameters as {
     limit?: number;
     filterBySuccess?: boolean;
   };
-  
+
   try {
     let logs = await getEmailLogs();
-    
+
     // Filter by success status if specified
     if (filterBySuccess !== undefined) {
       logs = logs.filter((log: EmailLogEntry) => log.success === filterBySuccess);
     }
-    
+
     // Sort by timestamp in descending order (newest first)
-    logs = logs.sort((a: EmailLogEntry, b: EmailLogEntry) => 
+    logs = logs.sort((a: EmailLogEntry, b: EmailLogEntry) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
-    
+
     // Limit the number of results if specified
     if (limit && limit > 0) {
       logs = logs.slice(0, limit);
     }
-    
+
     return {
       result: logs
     };
