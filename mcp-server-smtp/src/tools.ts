@@ -1,10 +1,10 @@
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { sendEmail, sendBulkEmails, EmailRecipient } from "./emailService.js";
-import { 
-  getSmtpConfigs, 
-  saveSmtpConfigs, 
-  getEmailTemplates, 
-  saveEmailTemplate, 
+import {
+  getSmtpConfigs,
+  saveSmtpConfigs,
+  getEmailTemplates,
+  saveEmailTemplate,
   deleteEmailTemplate,
   SmtpServerConfig,
   EmailTemplate,
@@ -86,12 +86,25 @@ export function createToolDefinitions(): Record<string, Tool> {
           smtpConfigId: {
             type: "string",
             description: "ID of the SMTP configuration to use. If not provided, the default configuration will be used."
+          },
+          images: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                content: { type: "string", description: "Base64 encoded image content" },
+                filename: { type: "string", description: "Filename for the image" },
+                cid: { type: "string", description: "Optional Content-ID for inline images (e.g. 'image1')" }
+              },
+              required: ["content", "filename"]
+            },
+            description: "Array of images to embed or attach. Note: For hosted images, use the 'upload-image' API instead."
           }
         },
         required: ["to", "subject", "body"]
       }
     },
-    
+
     "send-bulk-emails": {
       name: "send-bulk-emails",
       description: "Send emails in bulk to multiple recipients with rate limiting",
@@ -174,7 +187,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["recipients", "subject", "body"]
       }
     },
-    
+
     "get-smtp-configs": {
       name: "get-smtp-configs",
       description: "Get all SMTP configurations",
@@ -184,7 +197,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: []
       }
     },
-    
+
     "add-smtp-config": {
       name: "add-smtp-config",
       description: "Add a new SMTP configuration",
@@ -223,7 +236,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["name", "host", "port", "auth"]
       }
     },
-    
+
     "update-smtp-config": {
       name: "update-smtp-config",
       description: "Update an existing SMTP configuration",
@@ -266,7 +279,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["id"]
       }
     },
-    
+
     "delete-smtp-config": {
       name: "delete-smtp-config",
       description: "Delete an SMTP configuration",
@@ -281,7 +294,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["id"]
       }
     },
-    
+
     "get-email-templates": {
       name: "get-email-templates",
       description: "Get all email templates",
@@ -291,7 +304,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: []
       }
     },
-    
+
     "add-email-template": {
       name: "add-email-template",
       description: "Add a new email template",
@@ -318,7 +331,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["name", "subject", "body"]
       }
     },
-    
+
     "update-email-template": {
       name: "update-email-template",
       description: "Update an existing email template",
@@ -349,7 +362,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["id"]
       }
     },
-    
+
     "delete-email-template": {
       name: "delete-email-template",
       description: "Delete an email template",
@@ -364,7 +377,7 @@ export function createToolDefinitions(): Record<string, Tool> {
         required: ["id"]
       }
     },
-    
+
     "get-email-logs": {
       name: "get-email-logs",
       description: "Get logs of all email sending activity",
