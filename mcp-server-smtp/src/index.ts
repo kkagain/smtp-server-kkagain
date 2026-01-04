@@ -1,7 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createToolDefinitions } from "./tools.js";
-import { 
+import {
   setupRequestHandlers,
   handleSendEmail,
   handleSendBulkEmails,
@@ -24,6 +24,7 @@ import * as http from 'http';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import multer from 'multer';
 
 // Load environment variables
 dotenv.config();
@@ -87,12 +88,48 @@ async function runServer() {
 
     // HTTP Server for REST API and Swagger Documentation
     const app = express();
+
+    // Configure Multer for image uploads
+    const storage = multer.diskStorage({
+      destination: (req: any, file: any, cb: any) => {
+        const uploadDir = path.join(process.cwd(), 'public', 'images');
+        // Ensure directory exists
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+      },
+      filename: (req: any, file: any, cb: any) => {
+        // Create unique filename
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'img-' + uniqueSuffix + ext);
+      }
+    });
+
+    const upload = multer({
+      storage: storage,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+      },
+      fileFilter: (req: any, file: any, cb: any) => {
+        if (file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed!'));
+        }
+      }
+    });
     const port = parseInt(process.env.PORT || '3007');
-    
+
     // Middleware
     app.use(cors());
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    // Static files (Images)
+    // accessible at http://localhost:3007/public/images/filename.jpg
+    app.use('/public', express.static(path.join(process.cwd(), 'public')));
 
     // Setup Swagger documentation
     setupSwagger(app);
@@ -106,6 +143,35 @@ async function runServer() {
     };
 
     // API Routes
+
+    // Image Upload Endpoint
+    app.post('/api/upload-image', upload.single('image'), asyncHandler(async (req: any, res: any) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: 'No image file provided' });
+        }
+
+        // Construct public URL
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.headers['x-forwarded-host'] || req.get('host');
+        // Handle standard vs proxied headers
+        const hostHeader = Array.isArray(host) ? host[0] : host;
+        const protocolHeader = Array.isArray(protocol) ? protocol[0] : protocol;
+
+        const imageUrl = `${protocolHeader}://${hostHeader}/public/images/${req.file.filename}`;
+
+        res.json({
+          success: true,
+          imageUrl: imageUrl,
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          size: req.file.size
+        });
+      } catch (error) {
+        logToFile(`Image upload error: ${error}`);
+        res.status(500).json({ error: 'Image upload failed' });
+      }
+    }));
     app.post('/api/send-email', asyncHandler(async (req, res) => {
       const result = await handleSendEmail(req.body);
       res.json(result);
@@ -214,8 +280,8 @@ async function runServer() {
     }));
 
     app.get('/api/health', asyncHandler(async (req, res) => {
-      res.json({ 
-        status: 'healthy', 
+      res.json({
+        status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         version: '1.0.0'
@@ -235,7 +301,7 @@ async function runServer() {
           },
           templates: {
             getAll: 'GET /api/templates OR /api/get-email-templates',
-            add: 'POST /api/templates OR /api/add-email-template', 
+            add: 'POST /api/templates OR /api/add-email-template',
             update: 'PUT /api/templates/:id OR /api/update-email-template/:id',
             delete: 'DELETE /api/templates/:templateId OR /api/delete-email-template/:templateId'
           },
@@ -269,18 +335,18 @@ async function runServer() {
       console.log(`🏥 Health Check: http://localhost:${port}/api/health`);
       console.log(`Press Ctrl+C to exit.`);
     });
-    
+
     // Handle process termination
     process.on('SIGINT', () => {
       logToFile("Server shutting down due to SIGINT");
       process.exit(0);
     });
-    
+
     process.on('SIGTERM', () => {
       logToFile("Server shutting down due to SIGTERM");
       process.exit(0);
     });
-    
+
   } catch (error) {
     logToFile(`Server failed to start: ${error}`);
     process.exit(1);
