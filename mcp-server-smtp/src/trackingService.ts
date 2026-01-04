@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { getDatabaseManager } from './database.js';
 import { logToFile } from './index.js';
 import geoip from 'geoip-lite';
+import { getWebhookService } from './webhookService.js';
 
 export class TrackingService {
   private app: express.Application;
@@ -145,7 +146,7 @@ export class TrackingService {
     this.app.get('/api/analytics/:trackingId', async (req, res) => {
       try {
         const { trackingId } = req.params;
-        
+
         // Get email log
         const emailLog = await this.getEmailLogByTrackingId(trackingId);
         if (!emailLog) {
@@ -154,7 +155,7 @@ export class TrackingService {
 
         // Get all events for this email
         const events = await this.getEmailEvents(emailLog.id);
-        
+
         // Compile analytics
         const analytics = {
           messageId: emailLog.messageId,
@@ -290,6 +291,17 @@ export class TrackingService {
       }
 
       logToFile(`Recorded ${eventType} event for tracking ID: ${trackingId}`);
+
+      // Trigger webhooks (Mailspring-like notifications)
+      const webhookService = getWebhookService();
+      await webhookService.triggerWebhooks(eventType, {
+        ...eventData,
+        email: emailLog.recipientEmail,
+        subject: emailLog.subject,
+        messageId: emailLog.messageId,
+        trackingId
+      }, emailLog.userId);
+
     } catch (error) {
       logToFile(`Error recording email event: ${error}`);
     }

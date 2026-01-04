@@ -394,6 +394,67 @@ export function createToolDefinitions(): Record<string, Tool> {
           }
         }
       }
+    },
+
+    "get-webhooks": {
+      name: "get-webhooks",
+      description: "Get all registered webhooks",
+      inputSchema: {
+        type: "object",
+        properties: {
+          userId: {
+            type: "string",
+            description: "Optional user ID to filter webhooks"
+          }
+        }
+      }
+    },
+
+    "add-webhook": {
+      name: "add-webhook",
+      description: "Register a new webhook for real-time notifications",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Friendly name for the webhook"
+          },
+          url: {
+            type: "string",
+            description: "Destination URL to receive POST requests"
+          },
+          events: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of events to subscribe to (e.g. ['open', 'click'] or ['*'])"
+          },
+          secret: {
+            type: "string",
+            description: "Optional secret for HMAC signature verification"
+          },
+          userId: {
+            type: "string",
+            description: "Optional user ID to associate with the webhook"
+          }
+        },
+        required: ["name", "url"]
+      }
+    },
+
+    "delete-webhook": {
+      name: "delete-webhook",
+      description: "Delete a registered webhook",
+      inputSchema: {
+        type: "object",
+        properties: {
+          webhookId: {
+            type: "string",
+            description: "ID of the webhook to delete"
+          }
+        },
+        required: ["webhookId"]
+      }
     }
   };
 } 

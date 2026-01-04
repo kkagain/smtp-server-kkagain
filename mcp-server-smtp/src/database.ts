@@ -143,7 +143,7 @@ export interface EmailLog {
   priority: number;
   retryCount: number;
   errorMessage?: string;
-  
+
   // Tracking timestamps
   sentAt?: string;
   deliveredAt?: string;
@@ -157,7 +157,7 @@ export interface EmailLog {
   bounceReason?: string;
   complainedAt?: string;
   unsubscribedAt?: string;
-  
+
   // Geolocation data
   senderIp?: string;
   recipientIp?: string;
@@ -166,14 +166,14 @@ export interface EmailLog {
   recipientCountry?: string;
   recipientCity?: string;
   userAgent?: string;
-  
+
   // Content metadata
   emailSize?: number;
   hasAttachments: boolean;
   attachmentCount: number;
   htmlVersion: boolean;
   textVersion: boolean;
-  
+
   createdAt: string;
   updatedAt: string;
 }
@@ -234,7 +234,7 @@ export class DatabaseManager {
         default:
           throw new Error(`Unsupported database type: ${this.config.type}`);
       }
-      
+
       await this.createTables();
       logToFile(`Database initialized: ${this.config.type}`);
     } catch (error) {
@@ -246,12 +246,12 @@ export class DatabaseManager {
   private async initializeSQLite(): Promise<void> {
     const dbPath = this.config.url || './data/smtp_server.db';
     const dbDir = path.dirname(dbPath);
-    
+
     // Ensure directory exists
     await fs.ensureDir(dbDir);
-    
+
     this.sqliteDb = new sqlite3.Database(dbPath);
-    
+
     // Enable foreign keys
     await new Promise<void>((resolve, reject) => {
       this.sqliteDb!.exec('PRAGMA foreign_keys = ON', (err: Error | null) => {
@@ -270,7 +270,7 @@ export class DatabaseManager {
       user: this.config.username,
       password: this.config.password,
     });
-    
+
     await this.pgClient.connect();
   }
 
@@ -278,14 +278,14 @@ export class DatabaseManager {
     if (!this.config.supabaseUrl || !this.config.supabaseKey) {
       throw new Error('Supabase URL and key are required');
     }
-    
+
     this.supabase = createClient(this.config.supabaseUrl, this.config.supabaseKey);
   }
 
   private async createTables(): Promise<void> {
     const schemaPath = path.join(__dirname, '../database/schema.sql');
     const schema = await fs.readFile(schemaPath, 'utf-8');
-    
+
     if (this.config.type === 'sqlite' && this.sqliteDb) {
       // Split schema into individual statements for SQLite
       const statements = schema.split(';').filter(stmt => stmt.trim());
@@ -309,7 +309,7 @@ export class DatabaseManager {
   async createEmailLog(emailLog: Partial<EmailLog>): Promise<EmailLog> {
     const id = uuidv4();
     const now = moment().toISOString();
-    
+
     // Add geolocation data if IP is provided
     if (emailLog.senderIp) {
       const geo = geoip.lookup(emailLog.senderIp);
@@ -318,7 +318,7 @@ export class DatabaseManager {
         emailLog.senderCity = geo.city;
       }
     }
-    
+
     const newEmailLog: EmailLog = {
       id,
       userId: emailLog.userId,
@@ -335,7 +335,7 @@ export class DatabaseManager {
       priority: emailLog.priority || 1,
       retryCount: emailLog.retryCount || 0,
       errorMessage: emailLog.errorMessage,
-      
+
       sentAt: emailLog.sentAt,
       deliveredAt: emailLog.deliveredAt,
       openedAt: emailLog.openedAt,
@@ -348,7 +348,7 @@ export class DatabaseManager {
       bounceReason: emailLog.bounceReason,
       complainedAt: emailLog.complainedAt,
       unsubscribedAt: emailLog.unsubscribedAt,
-      
+
       senderIp: emailLog.senderIp,
       recipientIp: emailLog.recipientIp,
       senderCountry: emailLog.senderCountry,
@@ -356,13 +356,13 @@ export class DatabaseManager {
       recipientCountry: emailLog.recipientCountry,
       recipientCity: emailLog.recipientCity,
       userAgent: emailLog.userAgent,
-      
+
       emailSize: emailLog.emailSize,
       hasAttachments: emailLog.hasAttachments || false,
       attachmentCount: emailLog.attachmentCount || 0,
       htmlVersion: emailLog.htmlVersion || false,
       textVersion: emailLog.textVersion || false,
-      
+
       createdAt: now,
       updatedAt: now,
     };
@@ -380,7 +380,7 @@ export class DatabaseManager {
           html_version, text_version, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       const values = [
         newEmailLog.id, newEmailLog.userId, newEmailLog.campaignId, newEmailLog.templateId,
         newEmailLog.smtpConfigId, newEmailLog.messageId, newEmailLog.recipientEmail,
@@ -396,25 +396,25 @@ export class DatabaseManager {
         newEmailLog.hasAttachments, newEmailLog.attachmentCount, newEmailLog.htmlVersion,
         newEmailLog.textVersion, newEmailLog.createdAt, newEmailLog.updatedAt
       ];
-      
+
       await new Promise<void>((resolve, reject) => {
-        this.sqliteDb!.run(insertStmt, values, function(err: Error | null) {
+        this.sqliteDb!.run(insertStmt, values, function (err: Error | null) {
           if (err) reject(err);
           else resolve();
         });
       });
     }
-    
+
     return newEmailLog;
   }
 
   async updateEmailLogStatus(id: string, status: string, additionalData?: Partial<EmailLog>): Promise<void> {
     const now = moment().toISOString();
-    
+
     if (this.config.type === 'sqlite' && this.sqliteDb) {
       let updateClause = 'status = ?, updated_at = ?';
       let values: any[] = [status, now];
-      
+
       if (additionalData) {
         if (additionalData.deliveredAt) {
           updateClause += ', delivered_at = ?';
@@ -423,7 +423,7 @@ export class DatabaseManager {
         if (additionalData.openedAt) {
           updateClause += ', opened_at = ?, open_count = open_count + 1';
           values.push(additionalData.openedAt);
-          
+
           if (!additionalData.firstOpenedAt) {
             updateClause += ', first_opened_at = ?';
             values.push(additionalData.openedAt);
@@ -445,13 +445,13 @@ export class DatabaseManager {
           values.push(additionalData.bounceReason);
         }
       }
-      
+
       values.push(id);
-      
+
       const updateStmt = `UPDATE email_logs SET ${updateClause} WHERE id = ?`;
-      
+
       await new Promise<void>((resolve, reject) => {
-        this.sqliteDb!.run(updateStmt, values, function(err: Error | null) {
+        this.sqliteDb!.run(updateStmt, values, function (err: Error | null) {
           if (err) reject(err);
           else resolve();
         });
@@ -462,7 +462,7 @@ export class DatabaseManager {
   async createEmailEvent(event: Partial<EmailEvent>): Promise<EmailEvent> {
     const id = uuidv4();
     const now = moment().toISOString();
-    
+
     // Add geolocation data if IP is provided
     let geoData = {};
     if (event.ipAddress) {
@@ -476,7 +476,7 @@ export class DatabaseManager {
         };
       }
     }
-    
+
     const newEvent: EmailEvent = {
       id,
       emailLogId: event.emailLogId!,
@@ -495,7 +495,7 @@ export class DatabaseManager {
           country, city, latitude, longitude, timestamp
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       stmt.run([
         newEvent.id, newEvent.emailLogId, newEvent.eventType,
         JSON.stringify(newEvent.eventData), newEvent.ipAddress, newEvent.userAgent,
@@ -503,7 +503,7 @@ export class DatabaseManager {
         newEvent.timestamp
       ]);
     }
-    
+
     return newEvent;
   }
 
@@ -511,7 +511,7 @@ export class DatabaseManager {
   async createContact(contact: Partial<Contact>): Promise<Contact> {
     const id = uuidv4();
     const now = moment().toISOString();
-    
+
     const newContact: Contact = {
       id,
       userId: contact.userId,
@@ -540,7 +540,7 @@ export class DatabaseManager {
           complaint_count, created_at, updated_at, last_contacted
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       stmt.run([
         newContact.id, newContact.userId, newContact.email, newContact.firstName,
         newContact.lastName, newContact.phone, newContact.company, newContact.position,
@@ -550,7 +550,7 @@ export class DatabaseManager {
         newContact.lastContacted
       ]);
     }
-    
+
     return newContact;
   }
 
@@ -565,30 +565,30 @@ export class DatabaseManager {
         FROM email_logs
         WHERE 1=1
       `;
-      
+
       const params: any[] = [];
-      
+
       if (userId) {
         query += ' AND user_id = ?';
         params.push(userId);
       }
-      
+
       if (dateFrom) {
         query += ' AND created_at >= ?';
         params.push(dateFrom);
       }
-      
+
       if (dateTo) {
         query += ' AND created_at <= ?';
         params.push(dateTo);
       }
-      
+
       query += ' GROUP BY status, DATE(created_at) ORDER BY date DESC';
-      
+
       const stmt = this.sqliteDb.prepare(query);
       return stmt.all(params);
     }
-    
+
     return [];
   }
 
@@ -601,22 +601,136 @@ export class DatabaseManager {
         FROM email_logs
         WHERE recipient_country IS NOT NULL
       `;
-      
+
       const params: any[] = [];
-      
+
       if (userId) {
         query += ' AND user_id = ?';
         params.push(userId);
       }
-      
+
       query += ' GROUP BY recipient_country ORDER BY email_count DESC LIMIT ?';
       params.push(limit);
-      
+
       const stmt = this.sqliteDb.prepare(query);
       return stmt.all(params);
     }
-    
+
     return [];
+  }
+
+  // Webhook management
+  async createWebhook(webhook: Partial<Webhook>): Promise<Webhook> {
+    const id = uuidv4();
+    const now = moment().toISOString();
+
+    const newWebhook: Webhook = {
+      id,
+      userId: webhook.userId,
+      name: webhook.name || 'Unnamed Webhook',
+      url: webhook.url!,
+      events: webhook.events || [],
+      secret: webhook.secret,
+      isActive: webhook.isActive !== false,
+      retryCount: webhook.retryCount || 3,
+      timeoutSeconds: webhook.timeoutSeconds || 30,
+      successCount: 0,
+      failureCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    if (this.config.type === 'sqlite' && this.sqliteDb) {
+      const stmt = this.sqliteDb.prepare(`
+        INSERT INTO webhooks (
+          id, user_id, name, url, events, secret, is_active,
+          retry_count, timeout_seconds, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run([
+        newWebhook.id, newWebhook.userId, newWebhook.name, newWebhook.url,
+        JSON.stringify(newWebhook.events), newWebhook.secret, newWebhook.isActive,
+        newWebhook.retryCount, newWebhook.timeoutSeconds, newWebhook.createdAt, newWebhook.updatedAt
+      ]);
+    }
+
+    return newWebhook;
+  }
+
+  async getWebhooks(userId?: string): Promise<Webhook[]> {
+    if (this.config.type === 'sqlite' && this.sqliteDb) {
+      let query = 'SELECT * FROM webhooks WHERE 1=1';
+      const params: any[] = [];
+
+      if (userId) {
+        query += ' AND user_id = ?';
+        params.push(userId);
+      }
+
+      return new Promise((resolve, reject) => {
+        const stmt = this.sqliteDb!.prepare(query);
+        stmt.all(params, (err: Error | null, rows: any[]) => {
+          if (err) {
+            reject(err);
+          } else {
+            const webhooks = rows.map((row: any) => ({
+              ...row,
+              events: JSON.parse(row.events || '[]'),
+              isActive: row.is_active === 1
+            }));
+            resolve(webhooks);
+          }
+        });
+      });
+    }
+    return [];
+  }
+
+  async getWebhooksByEvent(eventType: string, userId?: string): Promise<Webhook[]> {
+    // In a real implementation, we would query the JSON, but for SQLite simple array check
+    // we fetch all and filter in memory for simplicity, or use LIKE
+    const webhooks = await this.getWebhooks(userId);
+    return webhooks.filter(wh => wh.isActive && (wh.events.includes(eventType) || wh.events.includes('*')));
+  }
+
+  async logWebhookDelivery(delivery: {
+    webhookId: string;
+    eventType: string;
+    payload: any;
+    responseStatus?: number;
+    responseBody?: string;
+    responseTimeMs?: number;
+    success: boolean;
+  }): Promise<void> {
+    const id = uuidv4();
+    const now = moment().toISOString();
+
+    if (this.config.type === 'sqlite' && this.sqliteDb) {
+      // Log delivery
+      const stmt = this.sqliteDb.prepare(`
+        INSERT INTO webhook_deliveries (
+          id, webhook_id, event_type, payload, response_status,
+          response_body, response_time_ms, delivered_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run([
+        id, delivery.webhookId, delivery.eventType, JSON.stringify(delivery.payload),
+        delivery.responseStatus, delivery.responseBody, delivery.responseTimeMs,
+        now, now
+      ]);
+
+      // Update success/failure counts
+      const updateStmt = this.sqliteDb.prepare(`
+        UPDATE webhooks 
+        SET ${delivery.success ? 'success_count = success_count + 1' : 'failure_count = failure_count + 1'},
+            last_triggered = ?
+        WHERE id = ?
+      `);
+
+      updateStmt.run([now, delivery.webhookId]);
+    }
   }
 
   async close(): Promise<void> {
@@ -645,10 +759,10 @@ export function getDatabaseManager(): DatabaseManager {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseKey: process.env.SUPABASE_ANON_KEY,
     };
-    
+
     dbManager = new DatabaseManager(config);
   }
-  
+
   return dbManager;
 }
 

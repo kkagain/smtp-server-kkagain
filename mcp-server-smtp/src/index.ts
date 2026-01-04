@@ -13,7 +13,10 @@ import {
   handleAddEmailTemplate,
   handleUpdateEmailTemplate,
   handleDeleteEmailTemplate,
-  handleGetEmailLogs
+  handleGetEmailLogs,
+  handleGetWebhooks,
+  handleAddWebhook,
+  handleDeleteWebhook
 } from "./requestHandler.js";
 import { ensureConfigDirectories } from "./config.js";
 import { setupSwagger } from "./swagger.js";
@@ -224,6 +227,21 @@ async function runServer() {
 
     app.get('/api/email-logs', asyncHandler(async (req, res) => {
       const result = await handleGetEmailLogs(req.query);
+      res.json(result);
+    }));
+
+    app.get('/api/webhooks', asyncHandler(async (req, res) => {
+      const result = await handleGetWebhooks(req.query);
+      res.json(result);
+    }));
+
+    app.post('/api/webhooks', asyncHandler(async (req, res) => {
+      const result = await handleAddWebhook(req.body);
+      res.json(result);
+    }));
+
+    app.delete('/api/webhooks', asyncHandler(async (req, res) => {
+      const result = await handleDeleteWebhook(req.body); // or req.query/params depending on implementation using toolParams
       res.json(result);
     }));
 
