@@ -59,6 +59,7 @@
     "express": "^4.21.2",
     "fs-extra": "^11.1.1",
     "geoip-lite": "^1.4.8",
+    "googleapis": "^171.4.0",
     "helmet": "^7.1.0",
     "imap": "^0.8.19",
     "jsonwebtoken": "^9.0.2",

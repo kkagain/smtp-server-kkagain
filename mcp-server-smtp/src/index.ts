@@ -1,5 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createToolDefinitions } from "./tools.js";
 import {
   setupRequestHandlers,
@@ -16,7 +17,18 @@ import {
   handleGetEmailLogs,
   handleGetWebhooks,
   handleAddWebhook,
-  handleDeleteWebhook
+  handleDeleteWebhook,
+  handleReadInbox,
+  handleReadThread,
+  handleSearchEmails,
+  handleMarkMessage,
+  handleGetAttachments,
+  handleSendGmail,
+  handleReplyEmail,
+  handleForwardEmail,
+  handleGetEmail,
+  handleGetThreadReplies,
+  handleMarkSpam
 } from "./requestHandler.js";
 import { ensureConfigDirectories } from "./config.js";
 import { setupSwagger } from "./swagger.js";
@@ -29,8 +41,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from the project directory (not cwd)
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Set up logging to a file instead of console
 const logDir = path.join(os.tmpdir(), 'smtp-mcp-server-logs');
@@ -137,6 +152,43 @@ async function runServer() {
     // Setup Swagger documentation
     setupSwagger(app);
 
+    // -------------------------------------------------------
+    // MCP over HTTP+SSE transport (for remote VPS / agents)
+    // -------------------------------------------------------
+    // Each connecting agent gets its own Server instance + SSEServerTransport.
+    // GET  /mcp/sse     — agent opens SSE stream (long-lived connection)
+    // POST /mcp/message — agent sends tool calls / requests
+    const sseTransports = new Map<string, SSEServerTransport>();
+
+    app.get('/mcp/sse', apiKeyAuth, async (req: any, res: any) => {
+      logToFile('[SSE] New MCP agent connected');
+      const sseTransport = new SSEServerTransport('/mcp/message', res);
+      const sseServer = new Server(
+        { name: 'smtp-mcp-server', version: '1.0.0' },
+        { capabilities: { tools: {} } }
+      );
+      const sseTools = createToolDefinitions();
+      await setupRequestHandlers(sseServer, sseTools);
+      await sseServer.connect(sseTransport);
+      const sessionId = sseTransport.sessionId;
+      sseTransports.set(sessionId, sseTransport);
+      logToFile(`[SSE] Session started: ${sessionId}`);
+      res.on('close', () => {
+        sseTransports.delete(sessionId);
+        logToFile(`[SSE] Session closed: ${sessionId}`);
+      });
+    });
+
+    app.post('/mcp/message', apiKeyAuth, async (req: any, res: any) => {
+      const sessionId = req.query.sessionId as string;
+      const sseTransport = sseTransports.get(sessionId);
+      if (!sseTransport) {
+        return res.status(400).json({ error: 'No active SSE session for sessionId: ' + sessionId });
+      }
+      await sseTransport.handlePostMessage(req, res);
+    });
+
+    // -------------------------------------------------------
     // API routes with error handling wrapper
     const asyncHandler = (fn: (req: any, res: any) => Promise<any>) => (req: any, res: any) => {
       Promise.resolve(fn(req, res)).catch((error) => {
@@ -267,7 +319,9 @@ async function runServer() {
     }));
 
     // Modern Email API Endpoints (with dynamic SMTP support)
-    app.post('/api/email/send', asyncHandler(async (req, res) => {
+    // NOTE: /api/email/send now uses Gmail OAuth (primary transport)
+    // For explicit SMTP nodemailer sending use /api/email/smtp/send
+    app.post('/api/email/smtp/send', asyncHandler(async (req, res) => {
       const result = await handleSendEmail(req.body);
       res.json(result);
     }));
@@ -336,8 +390,229 @@ async function runServer() {
     }));
 
     // Root redirect to docs
+
     app.get('/', (req, res) => {
       res.redirect('/docs');
+    });
+
+    // -------------------------------------------------------
+    // Stable REST API — designed for email_to_cosf.py migration
+    // Auth: x-api-key header (value from .env API_KEY)
+    // -------------------------------------------------------
+
+    // POST /api/email/list — list messages (replaces users().messages().list())
+    // Body: { maxResults?, q?, labelIds?, pageToken? }
+    // Returns: { success, messages: [{id, threadId, from, to, subject, date, snippet, labelIds}], nextPageToken? }
+    app.post('/api/email/list', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { maxResults = 10, q = '', labelIds = [], pageToken } = req.body || {};
+        const { fetchInboxMessages } = await import('./gmailService.js');
+        const raw = await fetchInboxMessages({ maxResults: Math.min(parseInt(maxResults) || 10, 100), q, labelIds, pageToken });
+        // fetchInboxMessages now returns already-decoded messages — use directly
+        res.json({ success: true, messages: raw.messages || [], nextPageToken: raw.nextPageToken });
+      } catch (error) {
+        logToFile(`[API] /email/list error: ${error}`);
+        res.status(500).json({ error: 'Failed to list emails', message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    // POST /api/email/read — get full message (replaces users().messages().get())
+    // Body: { messageId }
+    // Returns: { success, message: {id, threadId, from, to, cc, subject, date, messageId, inReplyTo, body:{text,html}, attachments:[{filename,mimeType,size}], labelIds} }
+    app.post('/api/email/read', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { messageId } = req.body || {};
+        if (!messageId) return res.status(400).json({ error: 'messageId is required' });
+        const { getMessage } = await import('./gmailService.js');
+        const message = await getMessage(messageId);
+        res.json({ success: true, message });
+      } catch (error) {
+        logToFile(`[API] /email/read error: ${error}`);
+        res.status(500).json({ error: 'Failed to read email', message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    // POST /api/email/send — send or reply (replaces users().messages().send())
+    // Body: { to, subject, body, from?, cc?, bcc?, html?, threadId?, inReplyTo?, attachments? }
+    //   threadId  — links message into existing Gmail thread (for compliance reply tracking)
+    //   inReplyTo — Message-Id header of parent (sets In-Reply-To / References headers)
+    // Returns: { success, messageId, threadId }
+    app.post('/api/email/send', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { to, subject, body, from, cc, bcc, html, threadId, inReplyTo } = req.body || {};
+        if (!to || !subject || !body) return res.status(400).json({ error: 'to, subject, body are required' });
+        const { sendGmail } = await import('./gmailService.js');
+        const result = await sendGmail({ to, subject, body, from, cc, bcc, html: html === true, threadId, inReplyTo });
+        res.json(result);
+      } catch (error) {
+        logToFile(`[API] /email/send error: ${error}`);
+        res.status(500).json({ error: 'Failed to send email', message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    // POST /api/email/search — search by subject/sender/keyword (replaces users().threads().list())
+    // Body: { query, maxResults? }
+    //   query supports Gmail search syntax: "from:someone@gmail.com", "subject:Compliance", "has:attachment"
+    // Returns: { success, messages: [{id, threadId, from, subject, date, snippet}] }
+    app.post('/api/email/search', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { query, maxResults = 10 } = req.body || {};
+        if (!query) return res.status(400).json({ error: 'query is required' });
+        const { fetchInboxMessages } = await import('./gmailService.js');
+        const raw = await fetchInboxMessages({ maxResults: Math.min(parseInt(maxResults) || 10, 100), q: query, labelIds: [] });
+        // fetchInboxMessages now returns already-decoded messages — use directly
+        res.json({ success: true, query, messages: raw.messages || [], nextPageToken: raw.nextPageToken });
+      } catch (error) {
+        logToFile(`[API] /email/search error: ${error}`);
+        res.status(500).json({ error: 'Failed to search emails', message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    // POST /api/email/thread — get all replies in a thread
+    // Body: { threadId }
+    // Returns: { success, threadId, messageCount, messages: [{id, from, subject, date, body:{text,html}}] }
+    app.post('/api/email/thread', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { threadId } = req.body || {};
+        if (!threadId) return res.status(400).json({ error: 'threadId is required' });
+        const { getThreadReplies } = await import('./gmailService.js');
+        const messages = await getThreadReplies(threadId);
+        res.json({ success: true, threadId, messageCount: messages.length, messages });
+      } catch (error) {
+        logToFile(`[API] /email/thread error: ${error}`);
+        res.status(500).json({ error: 'Failed to get thread', message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    // --- AI/agent-centric Gmail endpoints (for MCP/AI agent use) ---
+    // API Key Auth Middleware
+    function apiKeyAuth(req: any, res: any, next: any) {
+      const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+      if (!apiKey || apiKey !== process.env.API_KEY) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing API key' });
+      }
+      next();
+    }
+
+    // Enhanced Gmail inbox: search, label, pagination (protected)
+    app.get('/api/email/inbox', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const maxResults = req.query.maxResults ? parseInt(String(req.query.maxResults)) : 10;
+        if (isNaN(maxResults) || maxResults < 1 || maxResults > 100) {
+          return res.status(400).json({ error: 'maxResults must be between 1 and 100' });
+        }
+        const q = req.query.q ? String(req.query.q) : '';
+        const labelIds = req.query.labelIds ? String(req.query.labelIds).split(',') : [];
+        const pageToken = req.query.pageToken ? String(req.query.pageToken) : undefined;
+        const { fetchInboxMessages } = await import('./gmailService.js');
+        const result = await fetchInboxMessages({ maxResults, q, labelIds, pageToken });
+        res.json({ success: true, ...result });
+      } catch (error) {
+        logToFile(`[SECURITY] API error fetching inbox: ${error}`);
+        res.status(500).json({
+          error: 'Failed to fetch inbox',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    });
+
+    // Gmail thread endpoint (protected)
+    app.get('/api/email/thread/:threadId', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const threadId = req.params.threadId;
+        if (!threadId) {
+          return res.status(400).json({ error: 'Missing threadId parameter' });
+        }
+        const { fetchThread } = await import('./gmailService.js');
+        const thread = await fetchThread(threadId);
+        res.json({ success: true, thread });
+      } catch (error) {
+        logToFile(`API error fetching thread: ${error}`);
+        res.status(500).json({
+          error: 'Failed to fetch thread',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    });
+
+    // Gmail send via OAuth (protected)
+    app.post('/api/email/send-gmail', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { to, subject, body, from, cc, bcc, html } = req.body;
+        if (!to || !subject || !body) return res.status(400).json({ error: 'Missing required fields: to, subject, body' });
+        const { sendGmail } = await import('./gmailService.js');
+        const result = await sendGmail({ to, subject, body, from, cc, bcc, html: html === true });
+        res.json(result);
+      } catch (error) {
+        logToFile(`API error sending gmail: ${error}`);
+        res.status(500).json({ error: 'Failed to send email', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Gmail reply (protected)
+    app.post('/api/email/reply', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { threadId, to, subject, body, inReplyTo } = req.body;
+        if (!threadId || !to || !subject || !body || !inReplyTo) return res.status(400).json({ error: 'Missing required fields' });
+        const { replyToMessage } = await import('./gmailService.js');
+        const result = await replyToMessage({ threadId, to, subject, body, inReplyTo });
+        res.json({ success: true, result });
+      } catch (error) {
+        logToFile(`API error replying: ${error}`);
+        res.status(500).json({ error: 'Failed to reply', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Gmail forward (protected)
+    app.post('/api/email/forward', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { messageId, to, subject, body } = req.body;
+        if (!messageId || !to || !subject || !body) return res.status(400).json({ error: 'Missing required fields' });
+        const { forwardMessage } = await import('./gmailService.js');
+        const result = await forwardMessage({ messageId, to, subject, body });
+        res.json({ success: true, result });
+      } catch (error) {
+        logToFile(`API error forwarding: ${error}`);
+        res.status(500).json({ error: 'Failed to forward', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Get single message with full decoded body (protected)
+    app.get('/api/email/message/:messageId', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { getMessage } = await import('./gmailService.js');
+        const message = await getMessage(req.params.messageId);
+        res.json({ success: true, message });
+      } catch (error) {
+        logToFile(`API error fetching message: ${error}`);
+        res.status(500).json({ error: 'Failed to fetch message', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Get all thread replies with decoded bodies (protected)
+    app.get('/api/email/thread/:threadId/replies', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { getThreadReplies } = await import('./gmailService.js');
+        const messages = await getThreadReplies(req.params.threadId);
+        res.json({ success: true, threadId: req.params.threadId, messageCount: messages.length, messages });
+      } catch (error) {
+        logToFile(`API error fetching thread replies: ${error}`);
+        res.status(500).json({ error: 'Failed to fetch thread replies', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    });
+
+    // Mark message as spam (protected)
+    app.post('/api/email/spam', apiKeyAuth, async (req: any, res: any) => {
+      try {
+        const { messageId } = req.body;
+        if (!messageId) return res.status(400).json({ error: 'Missing messageId' });
+        const { markSpam } = await import('./gmailService.js');
+        const result = await markSpam(messageId);
+        res.json(result);
+      } catch (error) {
+        logToFile(`API error marking spam: ${error}`);
+        res.status(500).json({ error: 'Failed to mark spam', message: error instanceof Error ? error.message : 'Unknown error' });
+      }
     });
 
     // 404 handler

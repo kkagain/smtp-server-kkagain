@@ -455,6 +455,256 @@ export function createToolDefinitions(): Record<string, Tool> {
         },
         required: ["webhookId"]
       }
+    },
+
+    // --- Gmail / AI-agent tools ---
+    "read-inbox": {
+      name: "read-inbox",
+      description: "Read emails from Gmail inbox. Supports search query, label filtering, and pagination. Returns full message data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          maxResults: {
+            type: "number",
+            description: "Number of messages to return (1-100, default 10)"
+          },
+          q: {
+            type: "string",
+            description: "Gmail search query, e.g. 'from:user@example.com' or 'subject:invoice'"
+          },
+          labelIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Filter by Gmail label IDs, e.g. ['UNREAD', 'INBOX', 'IMPORTANT']"
+          },
+          pageToken: {
+            type: "string",
+            description: "Pagination token from a previous response to get the next page"
+          }
+        }
+      }
+    },
+
+    "read-thread": {
+      name: "read-thread",
+      description: "Read a complete Gmail thread (all messages in a conversation) by thread ID.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          threadId: {
+            type: "string",
+            description: "The Gmail thread ID to retrieve"
+          }
+        },
+        required: ["threadId"]
+      }
+    },
+
+    "search-emails": {
+      name: "search-emails",
+      description: "Search Gmail messages using a search query. Returns matching messages with full details.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Gmail search query string, e.g. 'from:boss@company.com has:attachment'"
+          },
+          maxResults: {
+            type: "number",
+            description: "Number of results to return (1-100, default 10)"
+          }
+        },
+        required: ["query"]
+      }
+    },
+
+    "mark-message": {
+      name: "mark-message",
+      description: "Mark a Gmail message as read, unread, starred, archived, or deleted.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messageId: {
+            type: "string",
+            description: "The Gmail message ID to modify"
+          },
+          read: {
+            type: "boolean",
+            description: "true to mark as read, false to mark as unread"
+          },
+          starred: {
+            type: "boolean",
+            description: "true to star the message, false to unstar"
+          },
+          archived: {
+            type: "boolean",
+            description: "true to archive, false to unarchive"
+          },
+          deleted: {
+            type: "boolean",
+            description: "true to move to trash"
+          }
+        },
+        required: ["messageId"]
+      }
+    },
+
+    "get-attachments": {
+      name: "get-attachments",
+      description: "Get all attachments for a Gmail message by message ID.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messageId: {
+            type: "string",
+            description: "The Gmail message ID to get attachments for"
+          }
+        },
+        required: ["messageId"]
+      }
+    },
+
+    "send-gmail": {
+      name: "send-gmail",
+      description: "Compose and send a new email via Gmail (OAuth). Supports plain text and HTML, cc, bcc.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          to: {
+            type: "string",
+            description: "Recipient email address(es), comma-separated"
+          },
+          subject: {
+            type: "string",
+            description: "Email subject"
+          },
+          body: {
+            type: "string",
+            description: "Email body (plain text or HTML)"
+          },
+          from: {
+            type: "string",
+            description: "Optional: sender display name and email, e.g. 'John Doe <john@gmail.com>'"
+          },
+          cc: {
+            type: "string",
+            description: "Optional: CC recipients, comma-separated"
+          },
+          bcc: {
+            type: "string",
+            description: "Optional: BCC recipients, comma-separated"
+          },
+          html: {
+            type: "boolean",
+            description: "Set to true if body is HTML. Default: false (plain text)"
+          }
+        },
+        required: ["to", "subject", "body"]
+      }
+    },
+
+    "reply-email": {
+      name: "reply-email",
+      description: "Reply to an existing Gmail thread.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          threadId: {
+            type: "string",
+            description: "The Gmail thread ID to reply to"
+          },
+          to: {
+            type: "string",
+            description: "Reply-to recipient email address"
+          },
+          subject: {
+            type: "string",
+            description: "Email subject (usually 'Re: original subject')"
+          },
+          body: {
+            type: "string",
+            description: "Reply body text"
+          },
+          inReplyTo: {
+            type: "string",
+            description: "Message-ID of the message being replied to"
+          }
+        },
+        required: ["threadId", "to", "subject", "body", "inReplyTo"]
+      }
+    },
+
+    "forward-email": {
+      name: "forward-email",
+      description: "Forward an existing Gmail message to another address.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messageId: {
+            type: "string",
+            description: "The Gmail message ID to forward"
+          },
+          to: {
+            type: "string",
+            description: "Forward-to recipient email address"
+          },
+          subject: {
+            type: "string",
+            description: "Email subject (usually 'Fwd: original subject')"
+          },
+          body: {
+            type: "string",
+            description: "Optional forwarding note to prepend"
+          }
+        },
+        required: ["messageId", "to", "subject", "body"]
+      }
+    },
+
+    "get-email": {
+      name: "get-email",
+      description: "Fetch the full content of a single Gmail message by message ID. Returns decoded plain-text and HTML body, all headers (from, to, cc, subject, date, message-id, in-reply-to), and a list of attachment metadata (filename, mimeType, size) without downloading the files.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messageId: {
+            type: "string",
+            description: "The Gmail message ID to fetch (obtained from read-inbox or search-emails)"
+          }
+        },
+        required: ["messageId"]
+      }
+    },
+
+    "get-thread-replies": {
+      name: "get-thread-replies",
+      description: "Get all messages/replies in a Gmail thread. Given a threadId, returns every message in chronological order with decoded body, sender, date, and subject. Use this to track replies to sent compliance reports or any sent email.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          threadId: {
+            type: "string",
+            description: "The Gmail thread ID (returned by send-gmail, read-inbox, or search-emails)"
+          }
+        },
+        required: ["threadId"]
+      }
+    },
+
+    "mark-spam": {
+      name: "mark-spam",
+      description: "Mark a Gmail message as spam and remove it from the inbox.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messageId: {
+            type: "string",
+            description: "The Gmail message ID to mark as spam"
+          }
+        },
+        required: ["messageId"]
+      }
     }
   };
 } 

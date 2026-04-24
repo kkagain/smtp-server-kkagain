@@ -326,6 +326,34 @@ export async function setupRequestHandlers(
         case "delete-webhook":
           return await handleDeleteWebhook(toolParams);
 
+        // --- Gmail / AI-agent tool handlers ---
+        case "read-inbox":
+          return await handleReadInbox(toolParams);
+
+        case "read-thread":
+          return await handleReadThread(toolParams);
+
+        case "search-emails":
+          return await handleSearchEmails(toolParams);
+
+        case "mark-message":
+          return await handleMarkMessage(toolParams);
+
+        case "get-attachments":
+          return await handleGetAttachments(toolParams);
+        case "send-gmail":
+          return await handleSendGmail(toolParams);
+        case "reply-email":
+          return await handleReplyEmail(toolParams);
+        case "forward-email":
+          return await handleForwardEmail(toolParams);
+        case "get-email":
+          return await handleGetEmail(toolParams);
+        case "get-thread-replies":
+          return await handleGetThreadReplies(toolParams);
+        case "mark-spam":
+          return await handleMarkSpam(toolParams);
+
         default:
           throw new Error(`Tool '${toolName}' exists but no handler is implemented`);
       }
@@ -879,6 +907,263 @@ export async function handleDeleteWebhook(parameters: any) {
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Handle read-inbox MCP tool — reads Gmail inbox with optional search/label/pagination
+ */
+export async function handleReadInbox(parameters: any) {
+  try {
+    const { fetchInboxMessages } = await import('./gmailService.js');
+    const maxResults = parameters.maxResults ? Math.min(Math.max(parseInt(parameters.maxResults), 1), 100) : 10;
+    const q = parameters.q || '';
+    const labelIds = Array.isArray(parameters.labelIds) ? parameters.labelIds : [];
+    const pageToken = parameters.pageToken;
+    const result = await fetchInboxMessages({ maxResults, q, labelIds, pageToken });
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in read-inbox: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error reading inbox: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle read-thread MCP tool — reads all messages in a Gmail thread
+ */
+export async function handleReadThread(parameters: any) {
+  try {
+    if (!parameters.threadId) throw new Error('threadId is required');
+    const { fetchThread } = await import('./gmailService.js');
+    const thread = await fetchThread(parameters.threadId);
+    return {
+      content: [{ type: "text", text: JSON.stringify(thread, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in read-thread: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error reading thread: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle search-emails MCP tool — search Gmail with a query string
+ */
+export async function handleSearchEmails(parameters: any) {
+  try {
+    if (!parameters.query) throw new Error('query is required');
+    const { fetchInboxMessages } = await import('./gmailService.js');
+    const maxResults = parameters.maxResults ? Math.min(Math.max(parseInt(parameters.maxResults), 1), 100) : 10;
+    const result = await fetchInboxMessages({ maxResults, q: parameters.query, labelIds: [] });
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in search-emails: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error searching emails: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle mark-message MCP tool — mark Gmail message as read/unread/starred/archived/deleted
+ */
+export async function handleMarkMessage(parameters: any) {
+  try {
+    if (!parameters.messageId) throw new Error('messageId is required');
+    const { modifyMessage } = await import('./gmailService.js');
+    const actions: any = {};
+    if (parameters.read !== undefined) actions.read = parameters.read;
+    if (parameters.starred !== undefined) actions.starred = parameters.starred;
+    if (parameters.archived !== undefined) actions.archived = parameters.archived;
+    if (parameters.deleted !== undefined) actions.deleted = parameters.deleted;
+    const result = await modifyMessage(parameters.messageId, actions);
+    return {
+      content: [{ type: "text", text: JSON.stringify({ success: true, result }, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in mark-message: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error marking message: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle get-attachments MCP tool — list all attachments for a Gmail message
+ */
+export async function handleGetAttachments(parameters: any) {
+  try {
+    if (!parameters.messageId) throw new Error('messageId is required');
+    const { getAttachments } = await import('./gmailService.js');
+    const attachments = await getAttachments(parameters.messageId);
+    return {
+      content: [{ type: "text", text: JSON.stringify({ success: true, attachments }, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in get-attachments: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error getting attachments: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle send-gmail MCP tool — compose and send a new email via Gmail OAuth
+ */
+export async function handleSendGmail(parameters: any) {
+  try {
+    if (!parameters.to) throw new Error('to is required');
+    if (!parameters.subject) throw new Error('subject is required');
+    if (!parameters.body) throw new Error('body is required');
+    const { sendGmail } = await import('./gmailService.js');
+    const result = await sendGmail({
+      to: parameters.to,
+      subject: parameters.subject,
+      body: parameters.body,
+      from: parameters.from,
+      cc: parameters.cc,
+      bcc: parameters.bcc,
+      html: parameters.html === true
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in send-gmail: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error sending Gmail: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle reply-email MCP tool — reply to an existing Gmail thread
+ */
+export async function handleReplyEmail(parameters: any) {
+  try {
+    if (!parameters.threadId) throw new Error('threadId is required');
+    if (!parameters.to) throw new Error('to is required');
+    if (!parameters.subject) throw new Error('subject is required');
+    if (!parameters.body) throw new Error('body is required');
+    if (!parameters.inReplyTo) throw new Error('inReplyTo is required');
+    const { replyToMessage } = await import('./gmailService.js');
+    const result = await replyToMessage({
+      threadId: parameters.threadId,
+      to: parameters.to,
+      subject: parameters.subject,
+      body: parameters.body,
+      inReplyTo: parameters.inReplyTo
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify({ success: true, result }, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in reply-email: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error replying to email: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle forward-email MCP tool — forward an existing Gmail message
+ */
+export async function handleForwardEmail(parameters: any) {
+  try {
+    if (!parameters.messageId) throw new Error('messageId is required');
+    if (!parameters.to) throw new Error('to is required');
+    if (!parameters.subject) throw new Error('subject is required');
+    if (!parameters.body) throw new Error('body is required');
+    const { forwardMessage } = await import('./gmailService.js');
+    const result = await forwardMessage({
+      messageId: parameters.messageId,
+      to: parameters.to,
+      subject: parameters.subject,
+      body: parameters.body
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify({ success: true, result }, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in forward-email: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error forwarding email: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle get-email MCP tool — fetch full single message with decoded body
+ */
+export async function handleGetEmail(parameters: any) {
+  try {
+    if (!parameters.messageId) throw new Error('messageId is required');
+    const { getMessage } = await import('./gmailService.js');
+    const message = await getMessage(parameters.messageId);
+    return {
+      content: [{ type: "text", text: JSON.stringify(message, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in get-email: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error fetching email: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle get-thread-replies MCP tool — get all messages in a thread with decoded bodies
+ */
+export async function handleGetThreadReplies(parameters: any) {
+  try {
+    if (!parameters.threadId) throw new Error('threadId is required');
+    const { getThreadReplies } = await import('./gmailService.js');
+    const messages = await getThreadReplies(parameters.threadId);
+    return {
+      content: [{ type: "text", text: JSON.stringify({ threadId: parameters.threadId, messageCount: messages.length, messages }, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in get-thread-replies: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error fetching thread replies: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
+    };
+  }
+}
+
+/**
+ * Handle mark-spam MCP tool — mark a Gmail message as spam
+ */
+export async function handleMarkSpam(parameters: any) {
+  try {
+    if (!parameters.messageId) throw new Error('messageId is required');
+    const { markSpam } = await import('./gmailService.js');
+    const result = await markSpam(parameters.messageId);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+    };
+  } catch (error) {
+    logToFile(`[MCP] Error in mark-spam: ${error}`);
+    return {
+      content: [{ type: "text", text: `Error marking as spam: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true
     };
   }
 }
