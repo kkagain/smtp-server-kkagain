@@ -1,0 +1,61 @@
+#!/bin/sh
+# Pre-commit hook: blocks commits containing real secrets
+# Installed via: scripts/install-git-hooks.ps1
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+FOUND=0
+
+# Get staged file content
+STAGED=$(git diff --cached --diff-filter=ACM -U0)
+
+check_pattern() {
+  local label="$1"
+  local pattern="$2"
+  local match
+  match=$(echo "$STAGED" | grep -P "^\+" | grep -vP "^\+\+\+" | grep -P "$pattern")
+  if [ -n "$match" ]; then
+    echo "${RED}[SECRET BLOCKED]${NC} $label found in staged changes:"
+    echo "$match" | head -5
+    FOUND=1
+  fi
+}
+
+# Block real email addresses (not generic placeholders)
+check_pattern "Real email address" \
+  "SMTP_USER\s*=\s*[a-zA-Z0-9._%+\-]+@(?!gmail\.com\"'$|example\.|your-|placeholder|<your|YOUR_)"
+
+# Block app passwords (Gmail format: 4 groups of 4 lowercase letters)
+check_pattern "Gmail app password" \
+  "SMTP_PASS\s*=\s*[a-z]{4}\s[a-z]{4}\s[a-z]{4}\s[a-z]{4}"
+
+# Block non-placeholder SMTP passwords
+check_pattern "Hardcoded SMTP password" \
+  "SMTP_PASS\s*=\s*(?!your-|change|placeholder|\$\{|#|\"|\s*$)[^\s'\"]+"
+
+# Block non-placeholder JWT secrets
+check_pattern "Hardcoded JWT secret" \
+  "JWT_SECRET\s*=\s*(?!your-|change|generate|placeholder|\$\{|#|\"|\s*$)[^\s'\"]+"
+
+# Block non-placeholder API keys
+check_pattern "Hardcoded API key" \
+  "API_KEY\s*=\s*(?!your-|change|placeholder|\$\{|#|docker-test|\"|\s*$)[^\s'\"]+"
+
+# Block non-placeholder DB passwords
+check_pattern "Hardcoded database password" \
+  "POSTGRES_PASSWORD\s*=\s*(?!change|secure_password_change|your_|placeholder|\$\{|#|\"|\s*$)[^\s'\"]+"
+
+# Block pgAdmin default credentials
+check_pattern "pgAdmin default credentials" \
+  "PGADMIN_DEFAULT_(EMAIL|PASSWORD)\s*=\s*(?!admin@admin\.com|admin|\$\{|change|your-)[^\s'\"]+"
+
+if [ "$FOUND" -eq 1 ]; then
+  echo ""
+  echo "${YELLOW}Commit blocked.${NC} Move secrets to a .env file and reference them as \${VARIABLE_NAME}."
+  echo "See mcp-server-smtp/.env.example for the correct pattern."
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,28 @@
+# Environment / secrets — NEVER commit these
+.env
+.env.local
+.env.production
+.env.test
+*.env
+
+# Local Docker override files (contain secrets)
+docker-compose.override.yml
+
+# Node
+node_modules/
+
+# Build output
+build/
+dist/
+
+# Logs
+logs/
+*.log
+
+# Data / uploads
+data/
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
